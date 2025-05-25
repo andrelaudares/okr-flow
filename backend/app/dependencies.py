@@ -1,80 +1,100 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from supabase import Client
-# from gotrue.errors import AuthApiException # Remover importação específica que está falhando
-# Pode ser necessário capturar uma exceção mais genérica ou específica do cliente Supabase/GoTrue
+from supabase import Client, create_client
+import traceback
 
-from .utils.supabase import supabase_client # Usar a instância global
-from .models.user import UserProfile, UserDB
+from .utils.supabase import supabase_client, supabase_admin
+from .models.user import UserProfile
+from .core.config import SUPABASE_URL, SUPABASE_SERVICE_KEY
 
 # Define o esquema OAuth2 para obter o token
-# tokenUrl="auth/login" refere-se à rota onde o cliente pode obter um token
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
-async def get_current_user(token: str = Depends(oauth2_scheme), supabase: Client = Depends(lambda: supabase_client)) -> UserProfile:
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
     """
     Dependency para obter o usuário logado com base no token JWT.
-    Verifica o token no Supabase Auth e busca dados adicionais na tabela public.users.
+    Simplificado para não depender de expiração automática.
     """
     try:
+        print(f"DEBUG: Validando token JWT...")
+        
+        # Verificar se o Supabase está configurado
+        if not supabase_client or not supabase_admin:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Serviço não configurado"
+            )
+        
+        # Obter o usuário usando o token JWT (usando supabase_client com token)
         try:
-            # Obter o usuário usando o token JWT fornecido
-            user_auth_response = supabase.auth.get_user(jwt=token)
-        except Exception as e:
-            error_detail = str(e).lower()
-            # A biblioteca supabase-py pode levantar exceções específicas para erros de JWT.
-            # Idealmente, importaríamos e capturaríamos essas exceções específicas (ex: gotrue.errors.AuthJWTError)
-            # Por enquanto, continuamos analisando a string do erro.
-            if "invalid" in error_detail or "expired" in error_detail or "unauthorized" in error_detail or "jwt" in error_detail:
-                print(f"Erro de autenticação Supabase ao validar JWT: {e}")
+            # Usar o token para autenticar e obter user info
+            user_auth_response = supabase_client.auth.get_user(jwt=token)
+            
+            if not user_auth_response or not user_auth_response.user:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token inválido ou expirado",
+                    detail="Token inválido",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
-            else:
-                print(f"Erro inesperado ao chamar supabase.auth.get_user: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Erro interno ao validar token: {e}",
-                )
-
-        if not user_auth_response or not user_auth_response.user:
+                
+            user_id = user_auth_response.user.id
+            print(f"DEBUG: Token válido para usuário: {user_id}")
+            
+        except Exception as e_auth:
+            print(f"DEBUG: Erro na validação do token: {e_auth}")
+            # Se der qualquer erro de autenticação, consideramos inválido
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Não autenticado ou usuário não encontrado no token",
+                detail="Token inválido ou expirado",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        user_id = user_auth_response.user.id
-
-        # Modificado para não usar .single() e tratar o caso de 0 ou múltiplas linhas
-        response = supabase.from_('users').select('*').eq('id', str(user_id)).execute()
-
-        if not response.data or len(response.data) == 0:
-            print(f"Usuário {user_id} autenticado via JWT, mas não encontrado na tabela public.users")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Dados do perfil do usuário não encontrados."
-            )
-        elif len(response.data) > 1:
-            # Este caso indica uma inconsistência de dados (múltiplos perfis para o mesmo user_id)
-            print(f"ERRO CRÍTICO: Múltiplos perfis encontrados para o user_id {user_id} na tabela public.users")
+        # Buscar dados do usuário na tabela users usando uma instância limpa do admin client
+        try:
+            # Criar nova instância do admin client para evitar problemas de JWT
+            if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+                raise Exception("Variáveis de ambiente do Supabase não configuradas")
+                
+            admin_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+            response = admin_client.from_('users').select('*').eq('id', str(user_id)).execute()
+            
+            if not response.data:
+                print(f"DEBUG: Usuário {user_id} não encontrado na tabela users")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Usuário não encontrado no sistema"
+                )
+            
+            user_data = response.data[0]
+            
+            # Verificar se usuário está ativo
+            if not user_data.get('is_active', True):
+                print(f"DEBUG: Usuário {user_id} está desativado")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Usuário desativado",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            
+            print(f"DEBUG: Dados do usuário recuperados com sucesso")
+            return UserProfile(**user_data)
+            
+        except HTTPException:
+            raise
+        except Exception as e_db:
+            print(f"DEBUG: Erro ao buscar dados do usuário na tabela: {e_db}")
+            print(f"DEBUG: Stack trace: {traceback.format_exc()}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Inconsistência nos dados do usuário."
+                detail="Erro interno ao buscar dados do usuário"
             )
-        
-        # Se chegou aqui, temos exatamente um usuário
-        user_profile_data = response.data[0]
-        return UserProfile(**user_profile_data)
 
-    except HTTPException as e_http:
-        raise e_http
+    except HTTPException:
+        raise
     except Exception as e_general:
-        # Esta captura genérica deve agora pegar menos casos, pois o PGRST116 foi tratado acima.
-        print(f"Erro inesperado na dependência get_current_user: {e_general}")
+        print(f"DEBUG: Erro geral na autenticação: {e_general}")
+        print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro interno do servidor ao processar autenticação: {e_general}"
+            detail="Erro interno do servidor na autenticação"
         ) 

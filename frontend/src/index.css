@@ -1,0 +1,102 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 50% 98%;
+    --foreground: 210 40% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 40% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 40% 10%;
+
+    --primary: 210 100% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 210 40% 20%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 20% 50%;
+
+    --accent: 210 20% 96%;
+    --accent-foreground: 210 40% 20%;
+
+    --destructive: 0 80% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 90%;
+    --input: 215 20% 90%;
+    --ring: 210 100% 45%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html, body {
+    @apply bg-background text-foreground font-sans scroll-smooth;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-image: linear-gradient(to right top, rgba(240, 249, 255, 0.2), rgba(220, 240, 255, 0.1)), 
+                      radial-gradient(circle at 80% 20%, rgba(220, 240, 255, 0.3), transparent),
+                      radial-gradient(circle at 20% 80%, rgba(220, 240, 255, 0.2), transparent);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Custom styles for the OKR app */
+  .card-hover {
+    @apply transition-all hover:shadow-md hover:-translate-y-0.5 duration-300;
+  }
+
+  .progress-bar {
+    @apply h-2 rounded-full bg-gray-100 overflow-hidden;
+  }
+
+  .progress-bar-fill {
+    @apply h-full transition-all duration-300 ease-in-out;
+  }
+
+  .status-badge {
+    @apply px-2 py-0.5 rounded text-xs font-medium;
+  }
+  
+  /* Animations */
+  @keyframes fade-in {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  
+  @keyframes slide-in {
+    0% { transform: translateX(-10px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+  }
+  
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out forwards;
+  }
+  
+  .animate-pulse {
+    animation: pulse 1.5s infinite;
+  }
+}

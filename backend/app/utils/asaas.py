@@ -5,10 +5,10 @@ from ..core.config import ASAAS_API_KEY
 ASAAS_API_URL = "https://api-sandbox.asaas.com/v3"
 
 def get_asaas_api_key() -> str:
-    key = os.environ.get("ASAAS_API_KEY")
-    if not key:
+    """Retorna a chave da API do Asaas"""
+    if not ASAAS_API_KEY:
         raise ValueError("Variável de ambiente ASAAS_API_KEY deve estar configurada.")
-    return key
+    return ASAAS_API_KEY
 
 def asaas_request(method: str, endpoint: str, data: dict = None) -> requests.Response:
     """
@@ -39,5 +39,9 @@ def create_asaas_customer(customer_data: dict) -> dict:
     """
     Cria um novo cliente no Asaas.
     """
+    if not ASAAS_API_KEY:
+        # Se não tiver chave do Asaas, retornar um ID fictício
+        return {"id": "mock_customer_id"}
+    
     response = asaas_request("POST", "customers", data=customer_data)
     return response.json() 
