@@ -13,7 +13,7 @@ import History from "./pages/History";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Navbar from "./components/layout/navbar";
-import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { UserEventListener } from "./components/users/UserEventListener";
 import Index from './pages/Index';
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,8 +29,19 @@ const queryClient = new QueryClient({
 
 // This component must be used inside AuthProvider
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Verificando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
