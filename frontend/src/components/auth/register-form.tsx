@@ -1,105 +1,206 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useUsers } from "@/hooks/use-users";
-import { v4 as uuidv4 } from "uuid";
+import { useAuth } from "@/hooks/use-auth";
+import { Eye, EyeOff, Loader2, Building, User } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+// Schema de validação
+const registerSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Nome é obrigatório")
+    .min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: z
+    .string()
+    .min(1, "Email é obrigatório")
+    .email("Email inválido"),
+  password: z
+    .string()
+    .min(1, "Senha é obrigatória")
+    .min(6, "Senha deve ter pelo menos 6 caracteres")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Senha deve conter pelo menos: 1 letra minúscula, 1 maiúscula e 1 número"),
+  cpf_cnpj: z
+    .string()
+    .min(1, "CPF ou CNPJ é obrigatório")
+    .min(11, "CPF/CNPJ deve ter pelo menos 11 caracteres"),
+});
+
+type RegisterFormData = z.infer<typeof registerSchema>;
 
 const RegisterForm = () => {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const { addUser } = useUsers();
+  const [showPassword, setShowPassword] = useState(false);
+  const { register: registerUser, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      cpf_cnpj: "",
+    },
+  });
+
+  const formatCpfCnpj = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
     
-    // Validate inputs
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      toast.error("Preencha todos os campos obrigatórios");
-      setIsLoading(false);
-      return;
+    if (numbers.length <= 11) {
+      // Formato CPF: 000.000.000-00
+      return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    } else {
+      // Formato CNPJ: 00.000.000/0000-00
+      return numbers.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
     }
-    
-    // In a real app, this would be an API call
-    setTimeout(() => {
-      try {
-        // Add the new user to the users store
-        const userId = uuidv4();
-        addUser({ name, email, password });
-        
-        // Mock successful registration
-        toast.success("Conta criada com sucesso!");
-        navigate("/login");
-      } catch (error) {
-        toast.error("Erro ao criar conta. Tente novamente.");
-      } finally {
-        setIsLoading(false);
-      }
-    }, 1000);
   };
+
+  const onSubmit = async (data: RegisterFormData) => {
+      try {
+      await registerUser({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        cpf_cnpj: data.cpf_cnpj,
+      });
+      // O redirecionamento é feito automaticamente pelo hook useAuth
+    } catch (error: any) {
+      console.error("Register error:", error);
+      // O erro já é tratado pelos interceptors da API
+      // Mas vamos garantir uma mensagem amigável
+      if (error.message) {
+        toast.error(error.message);
+      }
+    }
+  };
+
+  const isFormLoading = isLoading || isSubmitting;
 
   return (
     <Card className="w-full max-w-md shadow-card">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold text-center">Criar conta</CardTitle>
         <CardDescription className="text-center">
-          Insira suas informações para criar sua conta
+          Registre-se como proprietário da sua empresa
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleRegister}>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-2">
               <label htmlFor="name" className="text-sm font-medium">
-                Nome completo
+              Nome completo *
               </label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="João da Silva"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="João da Silva"
+                  {...register("name")}
+                  className={`pl-10 ${errors.name ? "border-red-500" : ""}`}
+                />
+                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              </div>
+            {errors.name && (
+              <p className="text-sm text-red-500">{errors.name.message}</p>
+            )}
             </div>
-            <div className="grid gap-2">
+
+          <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
-                E-mail
+              E-mail *
               </label>
               <Input
                 id="email"
                 type="email"
                 placeholder="nome@exemplo.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+              {...register("email")}
+              className={errors.email ? "border-red-500" : ""}
+            />
+            {errors.email && (
+              <p className="text-sm text-red-500">{errors.email.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="cpf_cnpj" className="text-sm font-medium">
+              CPF ou CNPJ *
+            </label>
+            <div className="relative">
+              <Input
+                id="cpf_cnpj"
+                type="text"
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                {...register("cpf_cnpj")}
+                className={`pl-10 ${errors.cpf_cnpj ? "border-red-500" : ""}`}
+                onChange={(e) => {
+                  const formatted = formatCpfCnpj(e.target.value);
+                  e.target.value = formatted;
+                }}
               />
+              <Building className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             </div>
-            <div className="grid gap-2">
+            {errors.cpf_cnpj && (
+              <p className="text-sm text-red-500">{errors.cpf_cnpj.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
-                Senha
+              Senha *
               </label>
+            <div className="relative">
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register("password")}
+                className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
               />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
             </div>
-            <Button disabled={isLoading} className="w-full">
-              {isLoading ? "Criando conta..." : "Criar conta"}
-            </Button>
+            {errors.password && (
+              <p className="text-sm text-red-500">{errors.password.message}</p>
+            )}
+            <p className="text-xs text-gray-500">
+              A senha deve conter pelo menos 6 caracteres, incluindo 1 letra minúscula, 1 maiúscula e 1 número.
+            </p>
           </div>
+
+          <Button 
+            type="submit" 
+            disabled={isFormLoading} 
+            className="w-full"
+          >
+            {isFormLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Registrando...
+              </>
+            ) : (
+              "Criar conta de proprietário"
+            )}
+          </Button>
         </form>
       </CardContent>
       <CardFooter className="flex justify-center">

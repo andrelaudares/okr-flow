@@ -14,8 +14,16 @@ export interface ActivityItem {
 export interface Objective {
   id: string;
   title: string;
-  description: string;
-  progress: number;
-  activities: ActivityItem[];
-  createdAt?: string; // Added createdAt as optional property
+  description?: string;
+  owner_id?: string;
+  company_id: string;
+  cycle_id: string;
+  status: 'PLANNED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED';
+  progress: number; // 0-100
+  created_at: string;
+  updated_at: string;
+  owner_name?: string;
+  cycle_name: string;
+  key_results_count: number;
+  activities?: ActivityItem[]; // Compatibilidade com código existente
 }

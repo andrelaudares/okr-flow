@@ -1,92 +1,45 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useObjectives } from '@/hooks/use-objectives';
-import { useSupabaseObjectives } from '@/hooks/use-supabase-objectives';
-import { useDashboardState } from './dashboard/use-dashboard-state';
-import { useObjectiveHandlers } from './objectives';
 
 export const useDashboardObjectives = () => {
-  const { isProcessing } = useDashboardState();
-
   const {
-    objectives: localObjectives,
-    addObjective: addLocalObjective,
-    addActivity: addLocalActivity,
-    updateActivity: updateLocalActivity,
-    deleteActivity: deleteLocalActivity,
-    deleteObjective: deleteLocalObjective
+    objectives,
+    isLoading,
+    addObjective,
+    deleteObjective,
+    addActivity,
+    updateActivity,
+    deleteActivity,
+    isAddingObjective,
+    isDeletingObjective
   } = useObjectives();
 
-  const {
-    objectives: remoteObjectives,
-    isLoading,
-    addObjective: addRemoteObjective,
-    addActivity: addRemoteActivity,
-    updateActivity: updateRemoteActivity,
-    deleteActivity: deleteRemoteActivity,
-    deleteObjective: deleteRemoteObjective
-  } = useSupabaseObjectives();
+  // Handlers para compatibilidade com o Dashboard existente
+  const handleAddObjective = useCallback(async (data: { title: string; description: string }) => {
+    return await addObjective(data);
+  }, [addObjective]);
 
-  // Determine if we're using remote data (from Supabase)
-  const isUsingRemoteData = useMemo(() => {
-    return remoteObjectives.length > 0;
-  }, [remoteObjectives.length]);
+  const handleAddActivity = useCallback((objectiveId: string, activity: any) => {
+    addActivity(objectiveId, activity);
+  }, [addActivity]);
 
-  // Determine which data source to use - remote (Supabase) or local (Zustand)
-  const objectives = useMemo(() => {
-    if (isUsingRemoteData) {
-      console.log('Using remote objectives from Supabase:', remoteObjectives.length);
-      return remoteObjectives;
-    } else {
-      console.log('Using local objectives from Zustand:', localObjectives.length);
-      return localObjectives;
-    }
-  }, [isUsingRemoteData, remoteObjectives, localObjectives]);
-  
-  // Create a source object based on whether we're using remote or local data
-  const objectiveSource = useCallback(() => {
-    if (isUsingRemoteData) {
-      console.log('Using remote objectives from Supabase');
-      return {
-        addObjective: (data: { title: string; description: string }) => {
-          return addRemoteObjective(data);
-        },
-        addActivity: addRemoteActivity, 
-        updateActivity: updateRemoteActivity,
-        deleteActivity: deleteRemoteActivity,
-        deleteObjective: deleteRemoteObjective
-      };
-    } else {
-      console.log('Using local objectives from Zustand');
-      return {
-        addObjective: (data: { title: string; description: string }) => {
-          return addLocalObjective(data);
-        },
-        addActivity: addLocalActivity,
-        updateActivity: updateLocalActivity,
-        deleteActivity: deleteLocalActivity,
-        deleteObjective: deleteLocalObjective
-      };
-    }
-  }, [
-    isUsingRemoteData,
-    addRemoteObjective, addRemoteActivity, updateRemoteActivity, deleteRemoteActivity, deleteRemoteObjective,
-    addLocalObjective, addLocalActivity, updateLocalActivity, deleteLocalActivity, deleteLocalObjective
-  ]);
-  
-  // Get handlers using the appropriate source
-  const {
-    handleAddObjective,
-    handleAddActivity,
-    handleUpdateActivity,
-    handleDeleteActivity,
-    handleDeleteObjective
-  } = useObjectiveHandlers(objectiveSource());
+  const handleUpdateActivity = useCallback((objectiveId: string, activity: any) => {
+    updateActivity(objectiveId, activity);
+  }, [updateActivity]);
+
+  const handleDeleteActivity = useCallback((objectiveId: string, activityId: string) => {
+    deleteActivity(objectiveId, activityId);
+  }, [deleteActivity]);
+
+  const handleDeleteObjective = useCallback((objectiveId: string) => {
+    deleteObjective(objectiveId);
+  }, [deleteObjective]);
 
   return {
     objectives,
     isLoading,
-    isProcessing,
-    isUsingRemoteData,
+    isProcessing: isAddingObjective || isDeletingObjective,
+    isUsingRemoteData: true, // Sempre usando API agora
     handleAddObjective,
     handleAddActivity,
     handleUpdateActivity,

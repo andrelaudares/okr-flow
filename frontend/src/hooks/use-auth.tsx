@@ -1,21 +1,27 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Session, User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+import api, { setTokens, clearTokens } from '@/lib/api';
+import type { 
+  User, 
+  LoginCredentials, 
+  RegisterData, 
+  AuthResponse
+} from '@/types/auth';
 
 interface AuthState {
-  user: { id: string; name: string; email: string } | null;
-  session: Session | null;
-  loading: boolean;
+  user: User | null;
+  token: string | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
 }
 
 interface AuthContextType extends AuthState {
-  login: (user: { id: string; name: string; email: string }) => void;
-  logout: () => void;
-  isLoggedIn: boolean;
-  isAuthenticated: boolean;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
+  logout: () => Promise<void>;
+  getCurrentUser: () => Promise<User | null>;
+  loading: boolean; // Adicionar propriedade loading
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,149 +29,182 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
-    session: null,
-    loading: true,
+    token: null,
+    isLoading: true,
+    isAuthenticated: false,
   });
+  
   const navigate = useNavigate();
 
+  // Verificar se há usuário armazenado ao inicializar
   useEffect(() => {
-    // Check if there's a user in localStorage first
-    const storedUser = localStorage.getItem("nobugOkrUser");
-
-    if (storedUser) {
+    const checkStoredAuth = async () => {
       try {
-        const userData = JSON.parse(storedUser);
-        setState(prev => ({
-          ...prev,
-          user: userData,
-          loading: false,
-        }));
-        console.log("Loaded user from localStorage:", userData.email);
-      } catch (error) {
-        console.error("Error parsing stored user:", error);
-        localStorage.removeItem("nobugOkrUser");
-      }
-    } else {
-      setState(prev => ({
-        ...prev,
-        loading: false,
-      }));
-    }
+        const storedUser = localStorage.getItem("nobugOkrUser");
+        const storedToken = localStorage.getItem("nobugOkrToken");
 
-    // Set up Supabase auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Supabase auth state changed:', event, session?.user?.email);
-        
-        if (event === 'SIGNED_IN' && session) {
-          // User is signed in
-          const userData = {
-            id: session.user.id,
-            name: session.user.user_metadata?.name || '',
-            email: session.user.email || '',
-          };
-
-          setState({
-            session,
-            user: userData,
-            loading: false,
-          });
-
-          // Update localStorage
-          localStorage.setItem("nobugOkrUser", JSON.stringify(userData));
-          console.log('User signed in:', userData.email);
-        } 
-        else if (event === 'SIGNED_OUT') {
-          // User is signed out
-          setState({
-            user: null,
-            session: null,
-            loading: false,
-          });
+        if (storedUser && storedToken) {
+          const userData = JSON.parse(storedUser);
           
-          localStorage.removeItem("nobugOkrUser");
-          console.log('User signed out');
+          // Verificar se token ainda é válido fazendo uma requisição
+          try {
+            const response = await api.get('/api/auth/me');
+            
+            setState({
+              user: response.data,
+              token: storedToken,
+              isLoading: false,
+              isAuthenticated: true,
+            });
+            
+            console.log("Usuário autenticado:", response.data.email);
+          } catch (error) {
+            // Token inválido, limpar dados
+            clearTokens();
+            setState({
+              user: null,
+              token: null,
+              isLoading: false,
+              isAuthenticated: false,
+            });
+          }
+        } else {
+          setState(prev => ({
+            ...prev,
+            isLoading: false,
+          }));
         }
-      }
-    );
-
-    // Then check for existing Supabase session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !state.user) {
-        const userData = {
-          id: session.user.id,
-          name: session.user.user_metadata?.name || '',
-          email: session.user.email || '',
-        };
-
-        setState({
-          session,
-          user: userData,
-          loading: false,
-        });
-
-        localStorage.setItem("nobugOkrUser", JSON.stringify(userData));
-        console.log('Found existing session for:', userData.email);
-      } else if (!session && !storedUser) {
+      } catch (error) {
+        console.error("Erro ao verificar autenticação:", error);
         setState(prev => ({
           ...prev,
-          loading: false,
+          isLoading: false,
         }));
       }
-    });
-
-    return () => {
-      subscription.unsubscribe();
     };
+
+    checkStoredAuth();
   }, []);
 
-  const login = (user: { id: string; name: string; email: string }) => {
-    setState(prev => ({
-      ...prev,
-      user,
-      loading: false,
-    }));
-    
-    localStorage.setItem("nobugOkrUser", JSON.stringify(user));
-    console.log('Manual login executed for:', user.email);
+  const login = async (credentials: LoginCredentials) => {
+    try {
+      setState(prev => ({ ...prev, isLoading: true }));
+      
+      // Enviar dados no formato esperado pelo backend (JSON simples)
+      const response = await api.post<AuthResponse>('/api/auth/login', {
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      const { access_token, token_type, user } = response.data;
+      
+      // Armazenar tokens e usuário
+      setTokens(access_token);
+      localStorage.setItem("nobugOkrUser", JSON.stringify(user));
+      
+      setState({
+        user,
+        token: access_token,
+        isLoading: false,
+        isAuthenticated: true,
+      });
+      
+      toast.success(`Bem-vindo, ${user.name}!`);
+      console.log('Login realizado com sucesso:', user.email);
+      navigate('/dashboard');
+      
+    } catch (error: any) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      console.error('Erro no login:', error);
+      
+      // Erro já é tratado pelo interceptor da API
+      throw error;
+    }
+  };
+
+  const register = async (data: RegisterData) => {
+    try {
+      setState(prev => ({ ...prev, isLoading: true }));
+      
+      // Enviar dados no formato esperado pelo backend UserRegister
+      const response = await api.post('/api/auth/register', {
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        username: data.email, // Usar email como username por enquanto
+        cpf_cnpj: data.cpf_cnpj || '000.000.000-00', // Campo obrigatório no backend
+      });
+
+      const responseData = response.data;
+      
+      setState(prev => ({ ...prev, isLoading: false }));
+      
+      // Backend retorna mensagem de aguardo aprovação
+      toast.success(responseData.message || 'Registro realizado com sucesso!');
+      console.log('Registro realizado com sucesso:', responseData);
+      
+      // Redirecionar para login pois registro requer aprovação
+      navigate('/login');
+      
+    } catch (error: any) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      console.error('Erro no registro:', error);
+      
+      // Erro já é tratado pelo interceptor da API
+      throw error;
+    }
   };
 
   const logout = async () => {
     try {
-      // First clear local state
+      // Fazer logout no backend
+      await api.post('/api/auth/logout');
+    } catch (error) {
+      console.error('Erro ao fazer logout no backend:', error);
+      // Continuar com logout local mesmo se falhar no backend
+    } finally {
+      // Limpar dados locais
+      clearTokens();
+      
       setState({
         user: null,
-        session: null,
-        loading: false,
+        token: null,
+        isLoading: false,
+        isAuthenticated: false,
       });
-      
-      // Clear localStorage
-      localStorage.removeItem("nobugOkrUser");
-      
-      // Then try to sign out from Supabase
-      await supabase.auth.signOut();
       
       toast.success('Logout realizado com sucesso');
       navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Erro ao fazer logout');
     }
   };
 
-  const isLoggedIn = !!state.user;
-  
-  // Create context value with both isLoggedIn and isAuthenticated
-  const contextValue = {
+  const getCurrentUser = async (): Promise<User | null> => {
+    try {
+      const response = await api.get<User>('/api/auth/me');
+      
+      setState(prev => ({
+        ...prev,
+        user: response.data,
+      }));
+      
+      return response.data;
+    } catch (error) {
+      console.error('Erro ao buscar dados do usuário:', error);
+      return null;
+    }
+  };
+
+  const value: AuthContextType = {
     ...state,
     login,
+    register,
     logout,
-    isLoggedIn,
-    isAuthenticated: isLoggedIn // Add isAuthenticated as alias
+    getCurrentUser,
+    loading: state.isLoading, // Mapear isLoading para loading
   };
 
   return (
-    <AuthContext.Provider value={contextValue}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -173,10 +212,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
-  
   return context;
+};
+
+// Hook para verificar permissões
+export const usePermissions = () => {
+  const { user } = useAuth();
+  
+  return {
+    isOwner: user?.is_owner || false,
+    isAdmin: user?.role === 'ADMIN' || user?.is_owner || false,
+    isManager: user?.role === 'MANAGER' || user?.role === 'ADMIN' || user?.is_owner || false,
+    canManageUsers: user?.role === 'ADMIN' || user?.is_owner || false,
+    canManageCompany: user?.is_owner || false,
+    canCreateObjectives: user?.role !== 'COLLABORATOR' || user?.is_owner || false,
+  };
 };

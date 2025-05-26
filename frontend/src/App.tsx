@@ -12,8 +12,10 @@ import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
+import CompanySettings from "./pages/CompanySettings";
+import TestSimple from "./pages/TestSimple";
 import Navbar from "./components/layout/navbar";
-import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { AuthProvider, useAuth } from "./hooks/use-auth";
 import { UserEventListener } from "./components/users/UserEventListener";
 import Index from './pages/Index';
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,10 +31,10 @@ const queryClient = new QueryClient({
 
 // This component must be used inside AuthProvider
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -59,6 +61,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   return (
     <Routes>
+      <Route path="/test" element={<TestSimple />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/reset-password" element={<ResetPassword />} />
@@ -83,6 +86,11 @@ const AppRoutes = () => {
       <Route path="/profile" element={
         <ProtectedRoute>
           <Profile />
+        </ProtectedRoute>
+      } />
+      <Route path="/company-settings" element={
+        <ProtectedRoute>
+          <CompanySettings />
         </ProtectedRoute>
       } />
       

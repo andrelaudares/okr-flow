@@ -9,27 +9,24 @@ export const useObjectivesFilter = (objectives: Objective[]) => {
 
   const filteredObjectives = objectives.filter((objective) => {
     const matchesSearchTerm = objective.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             objective.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                             (objective.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'completed' && objective.progress === 100) ||
       (statusFilter === 'in-progress' && objective.progress > 0 && objective.progress < 100) ||
       (statusFilter === 'not-started' && objective.progress === 0);
     
-    // For user filter, we want to show objectives where the user is involved
+    // For user filter, usar owner_name por enquanto (activities serão implementadas depois)
     const matchesUser = userFilter === 'all' || 
-      objective.activities.some(activity => activity.assignee === userFilter);
+      (objective.owner_name && objective.owner_name.includes(userFilter));
     
     return matchesSearchTerm && matchesStatus && matchesUser;
   }).map(objective => {
-    // When filtering by user, only show activities assigned to that user
-    if (userFilter !== 'all') {
-      return {
-        ...objective,
-        activities: objective.activities.filter(activity => activity.assignee === userFilter)
-      };
-    }
-    return objective;
+    // Garantir que activities existam para compatibilidade
+    return {
+      ...objective,
+      activities: objective.activities || []
+    };
   });
 
   return {

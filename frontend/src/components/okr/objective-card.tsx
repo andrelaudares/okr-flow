@@ -10,7 +10,7 @@ import ObjectiveFooter from './objective/objective-footer';
 export interface ObjectiveProps {
   id: string;
   title: string;
-  description: string;
+  description?: string; // Tornar opcional para compatibilidade com API
   progress: number;
   activities: ActivityItem[];
   isProcessing?: boolean;

@@ -7,6 +7,7 @@ import ExportReportButton from '@/components/okr/export-report-button';
 import { useDashboardObjectives } from '@/hooks/use-dashboard-objectives';
 import { useObjectivesFilter } from '@/hooks/use-objectives-filter';
 import { Loader2, LayoutDashboard } from 'lucide-react';
+import ErrorBoundary from '@/components/ui/error-boundary';
 
 const Dashboard = () => {
   const [isAddObjectiveDialogOpen, setIsAddObjectiveDialogOpen] = useState(false);
@@ -41,7 +42,8 @@ const Dashboard = () => {
   }, [handleAddObjective]);
 
   return (
-    <div className="container py-6 px-4 md:px-6 max-w-7xl mx-auto">
+    <ErrorBoundary>
+      <div className="container py-6 px-4 md:px-6 max-w-7xl mx-auto">
       <div className="flex items-center gap-2 mb-6 animate-fade-in">
         <div className="bg-nobug-100 p-2 rounded-lg">
           <LayoutDashboard className="h-5 w-5 text-nobug-600" />
@@ -99,7 +101,8 @@ const Dashboard = () => {
           <p className="text-nobug-600 font-medium">Desenvolvido por Nobug Tecnologia</p>
         </div>
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 

@@ -6,11 +6,17 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  username: string;
   role: UserRole;
   is_owner: boolean;
   is_active: boolean;
   company_id: string;
+  cpf_cnpj?: string;
+  phone?: string;
+  address?: string;
+  description?: string;
   created_at: string;
+  updated_at?: string;
 }
 
 // Credenciais de login
@@ -24,7 +30,12 @@ export interface RegisterData {
   name: string;
   email: string;
   password: string;
-  company_name: string;
+  username?: string;
+  cpf_cnpj?: string;
+  phone?: string;
+  address?: string;
+  description?: string;
+  company_name?: string; // Para compatibilidade frontend
 }
 
 // Resposta de autenticação
@@ -33,6 +44,13 @@ export interface AuthResponse {
   token_type: string;
   refresh_token?: string;
   user: User;
+}
+
+// Resposta de registro
+export interface RegisterResponse {
+  message: string;
+  user_id: string;
+  requires_approval: boolean;
 }
 
 // Estado de autenticação
@@ -58,13 +76,19 @@ export interface CreateUserData {
   name: string;
   email: string;
   password: string;
+  username?: string; // Tornado opcional - será gerado automaticamente
   role: 'ADMIN' | 'MANAGER' | 'COLLABORATOR';
 }
 
 // Dados para atualizar usuário
 export interface UpdateUserData {
   name?: string;
+  username?: string;
   role?: UserRole;
+  phone?: string;
+  address?: string;
+  description?: string;
+  is_active?: boolean;
 }
 
 // Resposta da lista de usuários
