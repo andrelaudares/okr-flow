@@ -97,4 +97,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor na autenticação"
-        ) 
+        )
+
+
+def get_supabase_admin() -> Client:
+    """
+    Dependency para obter o cliente Supabase admin.
+    """
+    if not supabase_admin:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Serviço Supabase não configurado"
+        )
+    return supabase_admin 

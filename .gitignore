@@ -17,6 +17,7 @@ dist-ssr
 *.local
 
 contexto
+test_
 
 # Editor directories and files
 .vscode/*

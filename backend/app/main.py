@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results
+from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results, reports, analytics, notifications
 
 app = FastAPI(
     title="Sistema OKR - Backend API", 
@@ -25,6 +25,9 @@ app.include_router(cycles.router, prefix="/api/cycles", tags=["Ciclos"])
 app.include_router(objectives.router, prefix="/api/objectives", tags=["Objetivos"])
 app.include_router(key_results.router, prefix="/api/objectives", tags=["Key Results"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Relatórios"])
+app.include_router(analytics.router, tags=["Analytics"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["Notificações"])
 app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Assinaturas"])
 
 @app.get("/", summary="Health Check")
@@ -32,7 +35,7 @@ async def read_root():
     return {
         "status": "API está online",
         "version": "1.0.0",
-        "sprint": "Sprint 6 - Dashboard Cards Variáveis"
+        "sprint": "Sprint 9 - Sistema de Notificações e Integrações"
     }
 
 @app.get("/health", summary="Health Check Detalhado")
@@ -40,7 +43,7 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "1.0.0",
-        "sprint": "Sprint 6",
+        "sprint": "Sprint 9",
         "features": [
             "Autenticação com Supabase",
             "Registro de usuário owner",
@@ -59,7 +62,25 @@ async def health_check():
             "Estatísticas em tempo real",
             "Métricas de progresso",
             "Contadores de objetivos",
-            "Evolução temporal"
+            "Evolução temporal",
+            "Sistema de relatórios",
+            "Exportação em múltiplos formatos",
+            "Geração em background",
+            "Download de arquivos",
+            "Sistema de histórico e analytics",
+            "Análise de tendências",
+            "Métricas de performance",
+            "Insights automáticos",
+            "Evolução temporal de objetivos",
+            "Sistema de notificações",
+            "Alertas automáticos",
+            "Configurações de notificação por usuário",
+            "Notificações de check-in pendente",
+            "Notificações de objetivo atrasado",
+            "Notificações de fim de ciclo",
+            "Notificações de meta atingida",
+            "Estatísticas de notificações",
+            "Filtros e paginação de notificações"
         ]
     }
 

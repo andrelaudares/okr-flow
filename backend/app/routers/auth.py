@@ -238,7 +238,8 @@ async def login_user(user_data: UserLogin):
                 "email": user_profile["email"],
                 "name": user_profile["name"],
                 "role": user_profile["role"],
-                "is_owner": user_profile["is_owner"]
+                "is_owner": user_profile["is_owner"],
+                "company_id": user_profile["company_id"]
             }
         }
         
