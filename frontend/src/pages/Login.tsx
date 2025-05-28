@@ -1,10 +1,19 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import LoginForm from '@/components/auth/login-form';
 import { Flag } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/use-auth';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-md mb-8 animate-fade-in">
@@ -20,6 +29,9 @@ const Login = () => {
       </div>
       <div className="w-full max-w-md">
         <LoginForm />
+      </div>
+      <div className="mt-6 text-center text-sm text-gray-500">
+        <p>Não tem uma conta? <Link to="/register" className="text-nobug-600 hover:underline">Cadastre-se</Link></p>
       </div>
     </div>
   );

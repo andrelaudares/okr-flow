@@ -46,29 +46,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (storedUser && storedToken) {
           const userData = JSON.parse(storedUser);
           
-          // Verificar se token ainda é válido fazendo uma requisição
-          try {
-            const response = await api.get('/api/auth/me');
-            
-            setState({
-              user: response.data,
-              token: storedToken,
-              isLoading: false,
-              isAuthenticated: true,
-            });
-            
-            console.log("Usuário autenticado:", response.data.email);
-          } catch (error) {
-            // Token inválido, limpar dados
-            clearTokens();
-            setState({
-              user: null,
-              token: null,
-              isLoading: false,
-              isAuthenticated: false,
-            });
-          }
+          setState({
+            user: userData,
+            token: storedToken,
+            isLoading: false,
+            isAuthenticated: true,
+          });
+          
+          console.log("Usuário autenticado:", userData.email);
         } else {
+          console.log("Nenhum token armazenado encontrado");
           setState(prev => ({
             ...prev,
             isLoading: false,
@@ -76,10 +63,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error("Erro ao verificar autenticação:", error);
-        setState(prev => ({
-          ...prev,
+        // Em caso de erro, limpar dados e definir como não autenticado
+        clearTokens();
+        setState({
+          user: null,
+          token: null,
           isLoading: false,
-        }));
+          isAuthenticated: false,
+        });
       }
     };
 

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { 
@@ -9,14 +10,13 @@ import type {
   UserFilters 
 } from '@/types/auth';
 
-interface UseUsersOptions {
-  filters?: UserFilters;
-}
-
 // Hook principal para gestão de usuários
-export const useUsers = (options: UseUsersOptions = {}) => {
+export const useUsers = () => {
   const queryClient = useQueryClient();
-  const { filters = {} } = options;
+  const [filters, setFilters] = useState<UserFilters>({
+    limit: 10,
+    offset: 0,
+  });
 
   // Query para listar usuários
   const {
@@ -38,6 +38,7 @@ export const useUsers = (options: UseUsersOptions = {}) => {
       const response = await api.get(`/api/users/?${params.toString()}`);
       return response.data;
     },
+    enabled: !!localStorage.getItem('nobugOkrToken'),
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
@@ -101,17 +102,59 @@ export const useUsers = (options: UseUsersOptions = {}) => {
   };
 
   // Calcular paginação
-  const limit = usersData?.filters_applied.limit || 10;
-  const offset = usersData?.filters_applied.offset || 0;
+  const limit = filters.limit || 10;
+  const offset = filters.offset || 0;
   const currentPage = Math.floor(offset / limit);
   const totalPages = Math.ceil((usersData?.total || 0) / limit);
+
+  // Funções de filtros e paginação
+  const applyFilters = (newFilters: Partial<UserFilters>) => {
+    setFilters(prev => ({
+      ...prev,
+      ...newFilters,
+      offset: 0, // Reset para primeira página
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      limit: 10,
+      offset: 0,
+    });
+  };
+
+  const nextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setFilters(prev => ({
+        ...prev,
+        offset: (currentPage + 1) * limit,
+      }));
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 0) {
+      setFilters(prev => ({
+        ...prev,
+        offset: (currentPage - 1) * limit,
+      }));
+    }
+  };
+
+  const setPage = (page: number) => {
+    if (page >= 0 && page < totalPages) {
+      setFilters(prev => ({
+        ...prev,
+        offset: page * limit,
+      }));
+    }
+  };
 
   return {
     // Dados
     users: usersData?.users || [],
     total: usersData?.total || 0,
     hasMore: usersData?.has_more || false,
-    filtersApplied: usersData?.filters_applied || {},
     
     // Estados de carregamento
     isLoading,
@@ -137,43 +180,25 @@ export const useUsers = (options: UseUsersOptions = {}) => {
     limit,
     offset,
     
-    // Filtros - criar funções auxiliares
-    filters: usersData?.filters_applied || {},
-    applyFilters: (newFilters: UserFilters) => {
-      // Invalidar e refetch com novos filtros seria implementado aqui
-      // Por agora, vamos fazer refetch simples
-      refetch();
-    },
-    clearFilters: () => {
-      refetch();
-    },
-    nextPage: () => {
-      if (currentPage < totalPages - 1) {
-        refetch();
-      }
-    },
-    prevPage: () => {
-      if (currentPage > 0) {
-        refetch();
-      }
-    },
-    setPage: (page: number) => {
-      refetch();
-    },
+    // Filtros
+    filters,
+    applyFilters,
+    clearFilters,
+    nextPage,
+    prevPage,
+    setPage,
   };
 };
 
-// Hook para filtros de usuários
+// Hook para filtros de usuários (mantido para compatibilidade)
 export const useUserFilters = () => {
   const queryClient = useQueryClient();
 
   const applyFilters = (filters: UserFilters) => {
-    // Invalidar queries com novos filtros
     queryClient.invalidateQueries({ queryKey: ['users'] });
   };
 
   const clearFilters = () => {
-    // Invalidar queries sem filtros
     queryClient.invalidateQueries({ queryKey: ['users'] });
   };
 

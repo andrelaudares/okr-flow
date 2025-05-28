@@ -1,11 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import signal
+import sys
 from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results, reports, analytics, notifications
+
+# Lifecycle manager para startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("🚀 Sistema OKR Backend iniciando...")
+    yield
+    # Shutdown
+    print("🛑 Sistema OKR Backend finalizando...")
 
 app = FastAPI(
     title="Sistema OKR - Backend API", 
     version="1.0.0",
-    description="Backend para sistema de gestão de OKRs com autenticação hierárquica"
+    description="Backend para sistema de gestão de OKRs com autenticação hierárquica",
+    lifespan=lifespan
 )
 
 # Configurar CORS
@@ -84,6 +97,15 @@ async def health_check():
         ]
     }
 
+# Handler para shutdown graceful
+def signal_handler(signum, frame):
+    print(f"\n🛑 Recebido sinal {signum}. Finalizando servidor...")
+    sys.exit(0)
+
+# Registrar handlers de sinal
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
 # Nota: Para rodar esta aplicação, você precisará de um arquivo .env
 # com as variáveis SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY e ASAAS_API_KEY.
-# Use `uvicorn app.main:app --reload` no diretório backend/ 
+# Use `uvicorn app.main:app --reload --timeout-keep-alive 30` no diretório backend/ 

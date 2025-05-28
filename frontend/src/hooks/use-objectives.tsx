@@ -1,25 +1,19 @@
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import type { Objective } from '@/types/okr';
+import type { 
+  Objective, 
+  CreateObjectiveData, 
+  UpdateObjectiveData, 
+  ObjectiveFilters, 
+  ObjectivesResponse, 
+  ObjectiveStats,
+  ObjectiveWithDetails 
+} from '@/types/objectives';
 
-// Interface para criar objetivo
-interface CreateObjectiveData {
-  title: string;
-  description?: string;
-  owner_id?: string;
-  cycle_id?: string;
-}
-
-// Interface para resposta da API
-interface ObjectivesResponse {
-  objectives: Objective[];
-  total: number;
-  has_more: boolean;
-}
-
-// Hook principal para objetivos
-export const useObjectives = () => {
+// Hook para gestão de objetivos
+export const useObjectives = (filters?: ObjectiveFilters) => {
   const queryClient = useQueryClient();
 
   // Query para listar objetivos
@@ -29,38 +23,85 @@ export const useObjectives = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['objectives'],
+    queryKey: ['objectives', filters],
     queryFn: async (): Promise<ObjectivesResponse> => {
-      try {
-        const response = await api.get('/api/objectives/');
-        return response.data;
-      } catch (error) {
-        console.error('Erro ao carregar objetivos:', error);
-        // Se der erro, retornar dados vazios para não crashar
-        return {
-          objectives: [],
-          total: 0,
-          has_more: false
-        };
+      const params = new URLSearchParams();
+      
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.status && filters.status.length > 0) {
+        filters.status.forEach(status => params.append('status', status));
       }
+      if (filters?.owner_id) params.append('owner_id', filters.owner_id);
+      if (filters?.cycle_id) params.append('cycle_id', filters.cycle_id);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+
+      const response = await api.get(`/api/objectives/?${params.toString()}`);
+      return response.data;
     },
+    enabled: !!localStorage.getItem('nobugOkrToken'),
     staleTime: 2 * 60 * 1000, // 2 minutos
-    retry: 1, // Tentar apenas 1 vez
   });
 
+  // Query para estatísticas de objetivos
+  const {
+    data: stats,
+    isLoading: isLoadingStats,
+    refetch: refetchStats,
+  } = useQuery({
+    queryKey: ['objectives', 'stats'],
+    queryFn: async (): Promise<ObjectiveStats> => {
+      const response = await api.get('/api/objectives/stats/summary');
+      return response.data;
+    },
+    enabled: !!localStorage.getItem('nobugOkrToken'),
+    staleTime: 5 * 60 * 1000, // 5 minutos
+  });
+
+  // Query para buscar objetivo específico
+  const getObjectiveById = (objectiveId: string) => {
+    return useQuery({
+      queryKey: ['objective', objectiveId],
+      queryFn: async (): Promise<ObjectiveWithDetails> => {
+        const response = await api.get(`/api/objectives/${objectiveId}`);
+        return response.data;
+      },
+      enabled: !!objectiveId,
+    });
+  };
+
   // Mutation para criar objetivo
-  const addObjectiveMutation = useMutation({
+  const createObjectiveMutation = useMutation({
     mutationFn: async (data: CreateObjectiveData): Promise<Objective> => {
       const response = await api.post('/api/objectives/', data);
       return response.data;
     },
     onSuccess: (newObjective) => {
       queryClient.invalidateQueries({ queryKey: ['objectives'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast.success(`Objetivo "${newObjective.title}" criado com sucesso!`);
     },
     onError: (error: any) => {
       console.error('Erro ao criar objetivo:', error);
-      toast.error('Erro ao criar objetivo');
+      toast.error(error.response?.data?.detail || 'Erro ao criar objetivo');
+    },
+  });
+
+  // Mutation para atualizar objetivo
+  const updateObjectiveMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateObjectiveData }): Promise<Objective> => {
+      const response = await api.put(`/api/objectives/${id}`, data);
+      return response.data;
+    },
+    onSuccess: (updatedObjective) => {
+      queryClient.invalidateQueries({ queryKey: ['objectives'] });
+      queryClient.invalidateQueries({ queryKey: ['objective', updatedObjective.id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast.success(`Objetivo "${updatedObjective.title}" atualizado com sucesso!`);
+    },
+    onError: (error: any) => {
+      console.error('Erro ao atualizar objetivo:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar objetivo');
     },
   });
 
@@ -71,66 +112,94 @@ export const useObjectives = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      toast.success('Objetivo removido com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast.success('Objetivo deletado com sucesso!');
     },
     onError: (error: any) => {
       console.error('Erro ao deletar objetivo:', error);
-      toast.error('Erro ao remover objetivo');
+      toast.error(error.response?.data?.detail || 'Erro ao deletar objetivo');
     },
   });
-
-  // Funções auxiliares para compatibilidade com o código existente
-  const addObjective = async (data: { title: string; description: string }): Promise<boolean> => {
-    try {
-      await addObjectiveMutation.mutateAsync({
-        title: data.title,
-        description: data.description
-      });
-      return true;
-    } catch (error) {
-      return false;
-    }
-  };
-
-  const deleteObjective = (objectiveId: string) => {
-    deleteObjectiveMutation.mutate(objectiveId);
-  };
-
-  // Funções de atividades (por enquanto vazias, serão implementadas depois)
-  const addActivity = (objectiveId: string, activity: any) => {
-    console.log('addActivity será implementado na próxima fase');
-    toast.info('Gestão de atividades será implementada na próxima fase');
-  };
-
-  const updateActivity = (objectiveId: string, activity: any) => {
-    console.log('updateActivity será implementado na próxima fase');
-    toast.info('Gestão de atividades será implementada na próxima fase');
-  };
-
-  const deleteActivity = (objectiveId: string, activityId: string) => {
-    console.log('deleteActivity será implementado na próxima fase');
-    toast.info('Gestão de atividades será implementada na próxima fase');
-  };
 
   return {
     // Dados
     objectives: objectivesData?.objectives || [],
     total: objectivesData?.total || 0,
+    hasMore: objectivesData?.has_more || false,
+    filtersApplied: objectivesData?.filters_applied || {},
+    stats,
     
     // Estados
     isLoading,
+    isLoadingStats,
+    isError: !!error,
     error,
     
-    // Funções
-    addObjective,
-    deleteObjective,
-    addActivity,
-    updateActivity,
-    deleteActivity,
-    refetch,
+    // Estados das mutations
+    isCreating: createObjectiveMutation.isPending,
+    isUpdating: updateObjectiveMutation.isPending,
+    isDeleting: deleteObjectiveMutation.isPending,
     
-    // Mutations estados
-    isAddingObjective: addObjectiveMutation.isPending,
-    isDeletingObjective: deleteObjectiveMutation.isPending,
+    // Funções
+    createObjective: createObjectiveMutation.mutateAsync,
+    updateObjective: (id: string, data: UpdateObjectiveData) => 
+      updateObjectiveMutation.mutateAsync({ id, data }),
+    deleteObjective: deleteObjectiveMutation.mutateAsync,
+    getObjectiveById,
+    refetch,
+    refetchStats,
+  };
+};
+
+// Hook para filtros de objetivos
+export const useObjectiveFilters = () => {
+  const [filters, setFilters] = React.useState<ObjectiveFilters>({
+    search: '',
+    status: [],
+    owner_id: '',
+    cycle_id: '',
+    limit: 50,
+    offset: 0,
+  });
+
+  const updateFilter = (key: keyof ObjectiveFilters, value: any) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+      offset: key !== 'offset' ? 0 : value, // Reset offset quando outros filtros mudam
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: [],
+      owner_id: '',
+      cycle_id: '',
+      limit: 50,
+      offset: 0,
+    });
+  };
+
+  const nextPage = () => {
+    setFilters(prev => ({
+      ...prev,
+      offset: (prev.offset || 0) + (prev.limit || 50),
+    }));
+  };
+
+  const prevPage = () => {
+    setFilters(prev => ({
+      ...prev,
+      offset: Math.max(0, (prev.offset || 0) - (prev.limit || 50)),
+    }));
+  };
+
+  return {
+    filters,
+    updateFilter,
+    clearFilters,
+    nextPage,
+    prevPage,
   };
 };

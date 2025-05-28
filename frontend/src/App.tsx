@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -13,10 +12,13 @@ import History from "./pages/History";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import CompanySettings from "./pages/CompanySettings";
+import Cycles from "./pages/cycles/Cycles";
+import Objectives from "./pages/objectives/Objectives";
+import ObjectiveKeyResults from "./pages/objectives/ObjectiveKeyResults";
+import CompanySettingsPage from "./pages/company/CompanySettings";
 import TestSimple from "./pages/TestSimple";
 import Navbar from "./components/layout/navbar";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
-import { UserEventListener } from "./components/users/UserEventListener";
 import Index from './pages/Index';
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -90,7 +92,22 @@ const AppRoutes = () => {
       } />
       <Route path="/company-settings" element={
         <ProtectedRoute>
-          <CompanySettings />
+          <CompanySettingsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/cycles" element={
+        <ProtectedRoute>
+          <Cycles />
+        </ProtectedRoute>
+      } />
+      <Route path="/objectives" element={
+        <ProtectedRoute>
+          <Objectives />
+        </ProtectedRoute>
+      } />
+      <Route path="/objectives/:objectiveId/key-results" element={
+        <ProtectedRoute>
+          <ObjectiveKeyResults />
         </ProtectedRoute>
       } />
       
@@ -104,7 +121,6 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <UserEventListener />
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />

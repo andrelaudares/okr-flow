@@ -114,4 +114,5 @@ class TimeCardsResponse(BaseModel):
     """Resposta com cards temporais"""
     available_cards: list[TimeCard]
     user_preferences: Optional[DashboardPreferences]
-    active_cycle: Optional[CycleStatus] 
+    active_cycle: Optional[CycleStatus]
+    all_cycles: list[CycleStatus] = Field(default=[], description="Todos os ciclos da empresa") 

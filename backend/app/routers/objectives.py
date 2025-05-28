@@ -33,7 +33,7 @@ def apply_text_search_filter(query, search_term: str):
 
 def apply_status_filter(query, statuses: List[ObjectiveStatus]):
     """Aplica filtro de status"""
-    status_values = [status.value for status in statuses]
+    status_values = [status_item.value for status_item in statuses]
     return query.in_('status', status_values)
 
 async def get_key_results_count(objective_id: str) -> int:
@@ -48,7 +48,7 @@ async def get_key_results_count(objective_id: str) -> int:
 @router.get("/", response_model=ObjectiveListResponse, summary="Listar objetivos")
 async def list_objectives(
     search: Optional[str] = Query(None, description="Busca por título ou descrição"),
-    status: Optional[List[ObjectiveStatus]] = Query(None, description="Filtrar por status"),
+    status_filter: Optional[List[ObjectiveStatus]] = Query(None, alias="status", description="Filtrar por status"),
     owner_id: Optional[UUID] = Query(None, description="Filtrar por responsável"),
     cycle_id: Optional[UUID] = Query(None, description="Filtrar por ciclo"),
     limit: int = Query(50, ge=1, le=100, description="Limite de resultados"),
@@ -69,7 +69,7 @@ async def list_objectives(
         # Criar filtros
         filters = ObjectiveFilter(
             search=search,
-            status=status,
+            status=status_filter,
             owner_id=owner_id,
             cycle_id=cycle_id,
             limit=limit,

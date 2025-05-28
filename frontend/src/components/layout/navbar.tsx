@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth, usePermissions } from '@/hooks/use-auth';
 import { 
   NavigationMenu,
   NavigationMenuLink,
@@ -9,17 +8,19 @@ import {
   navigationMenuTriggerStyle
 } from "@/components/ui/navigation-menu";
 import { cn } from '@/lib/utils';
-import { LogOut, User, Flag } from 'lucide-react';
+import { LogOut, User, Flag, Building2, Settings } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
+  const { isOwner, isAdmin } = usePermissions();
   const location = useLocation();
   
   const isActive = (path: string) => location.pathname === path;
@@ -59,6 +60,30 @@ const Navbar = () => {
                     Dashboard
                   </NavigationMenuLink>
                 </Link>
+                
+                <Link to="/objectives">
+                  <NavigationMenuLink 
+                    className={cn(
+                      navigationMenuTriggerStyle(),
+                      isActive('/objectives') && "bg-accent text-accent-foreground"
+                    )}
+                  >
+                    Objetivos
+                  </NavigationMenuLink>
+                </Link>
+                
+                {(isOwner || isAdmin) && (
+                  <Link to="/cycles">
+                    <NavigationMenuLink 
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        isActive('/cycles') && "bg-accent text-accent-foreground"
+                      )}
+                    >
+                      Ciclos
+                    </NavigationMenuLink>
+                  </Link>
+                )}
                 
                 <Link to="/history">
                   <NavigationMenuLink 
@@ -108,6 +133,20 @@ const Navbar = () => {
                     Meu Perfil
                   </Link>
                 </DropdownMenuItem>
+                
+                {(isOwner || isAdmin) && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/company-settings" className="flex items-center cursor-pointer">
+                        <Building2 className="mr-2 h-4 w-4" />
+                        Configurações da Empresa
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-red-600 cursor-pointer">
                   <LogOut className="mr-2 h-4 w-4" />
                   Sair

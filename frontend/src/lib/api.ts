@@ -60,50 +60,45 @@ api.interceptors.response.use(
           
           return api(originalRequest);
         } catch (refreshError) {
-          // Refresh falhou, fazer logout
-          localStorage.removeItem('nobugOkrToken');
-          localStorage.removeItem('nobugOkrRefreshToken');
-          localStorage.removeItem('nobugOkrUser');
-          
-          toast.error('Sessão expirada. Faça login novamente.');
-          window.location.href = '/login';
-          
+          // Refresh falhou, limpar tokens mas NÃO redirecionar automaticamente
+          clearTokens();
+          console.log('Token expirado, dados de autenticação limpos');
           return Promise.reject(refreshError);
         }
       } else {
-        // Não há refresh token, redirecionar para login
-        localStorage.removeItem('nobugOkrToken');
-        localStorage.removeItem('nobugOkrUser');
-        
-        toast.error('Sessão expirada. Faça login novamente.');
-        window.location.href = '/login';
+        // Não há refresh token, limpar dados mas NÃO redirecionar automaticamente
+        clearTokens();
+        console.log('Nenhum refresh token, dados de autenticação limpos');
       }
     }
 
-    // Tratamento de outros erros
+    // Tratamento de outros erros - mostrar toast apenas para erros relevantes
     const errorMessage = error.response?.data?.detail || 
                         error.response?.data?.message || 
                         error.message || 
                         'Erro inesperado';
 
-    // Mostrar toast para erros específicos
-    switch (error.response?.status) {
-      case 403:
-        toast.error('Você não tem permissão para realizar esta ação');
-        break;
-      case 404:
-        toast.error('Recurso não encontrado');
-        break;
-      case 422:
-        toast.error('Dados inválidos: ' + errorMessage);
-        break;
-      case 500:
-        toast.error('Erro interno do servidor');
-        break;
-      default:
-        if (error.response?.status !== 401) {
-          toast.error(errorMessage);
-        }
+    // Mostrar toast apenas para erros que não sejam 401 (para evitar spam)
+    if (error.response?.status !== 401) {
+      switch (error.response?.status) {
+        case 403:
+          toast.error('Você não tem permissão para realizar esta ação');
+          break;
+        case 404:
+          toast.error('Recurso não encontrado');
+          break;
+        case 422:
+          toast.error('Dados inválidos: ' + errorMessage);
+          break;
+        case 500:
+          toast.error('Erro interno do servidor');
+          break;
+        default:
+          // Só mostrar toast para erros inesperados
+          if (error.response?.status && error.response.status >= 500) {
+            toast.error(errorMessage);
+          }
+      }
     }
 
     return Promise.reject(error);

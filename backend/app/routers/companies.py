@@ -8,8 +8,8 @@ from ..utils.supabase import supabase_admin
 
 router = APIRouter()
 
-@router.get("/", response_model=CompanyProfile, summary="Dados da empresa do usuário")
-async def get_company(current_user: UserProfile = Depends(get_current_user)):
+@router.get("/profile", response_model=CompanyProfile, summary="Dados da empresa do usuário")
+async def get_company_profile(current_user: UserProfile = Depends(get_current_user)):
     """
     Retorna os dados da empresa do usuário logado, incluindo estatísticas.
     """
@@ -71,13 +71,81 @@ async def get_company(current_user: UserProfile = Depends(get_current_user)):
             detail="Erro interno do servidor"
         )
 
-@router.put("/{company_id}", response_model=Company, summary="Atualizar dados da empresa")
-async def update_company(
+@router.put("/profile", response_model=CompanyProfile, summary="Atualizar dados da empresa")
+async def update_company_profile(
+    company_data: CompanyUpdate, 
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Atualiza os dados da empresa do usuário logado.
+    Apenas owners e admins podem atualizar dados da empresa.
+    """
+    try:
+        # Verificar se é owner ou admin
+        if not current_user.is_owner and current_user.role not in ['ADMIN']:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Apenas owners e admins podem atualizar dados da empresa"
+            )
+        
+        if not current_user.company_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Usuário não possui empresa associada"
+            )
+        
+        # Verificar se empresa existe
+        existing_company = supabase_admin.from_('companies').select("*").eq('id', str(current_user.company_id)).single().execute()
+        
+        if not existing_company.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Empresa não encontrada"
+            )
+        
+        # Preparar dados para atualização
+        update_data = {}
+        for field, value in company_data.dict(exclude_unset=True).items():
+            if value is not None:
+                update_data[field] = value
+        
+        if not update_data:
+            # Se não há dados para atualizar, retornar empresa atual
+            return await get_company_profile(current_user)
+        
+        # Adicionar timestamp de atualização
+        update_data['updated_at'] = 'now()'
+        
+        # Executar atualização
+        update_response = supabase_admin.from_('companies').update(update_data).eq('id', str(current_user.company_id)).execute()
+        
+        if not update_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                detail="Erro ao atualizar empresa"
+            )
+        
+        # Retornar dados atualizados
+        return await get_company_profile(current_user)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Erro ao atualizar empresa: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Erro interno do servidor"
+        )
+
+# Manter a rota antiga para compatibilidade (deprecated)
+@router.put("/{company_id}", response_model=Company, summary="[DEPRECATED] Atualizar dados da empresa")
+async def update_company_deprecated(
     company_id: UUID, 
     company_data: CompanyUpdate, 
     current_user: UserProfile = Depends(get_current_user)
 ):
     """
+    [DEPRECATED] Use PUT /profile em vez desta rota.
     Atualiza os dados da empresa.
     Apenas owners podem atualizar dados da empresa.
     """

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Flag, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -7,12 +7,6 @@ import { useAuth } from '@/hooks/use-auth';
 const Index = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    }
-  }, [isAuthenticated, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -27,12 +21,20 @@ const Index = () => {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/login')}>
-              Login
-            </Button>
-            <Button onClick={() => navigate('/register')} className="shadow-md hover:shadow-nobug-200/50">
-              Cadastrar
-            </Button>
+            {isAuthenticated ? (
+              <Button onClick={() => navigate('/dashboard')} className="shadow-md hover:shadow-nobug-200/50">
+                Ir para Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => navigate('/login')}>
+                  Login
+                </Button>
+                <Button onClick={() => navigate('/register')} className="shadow-md hover:shadow-nobug-200/50">
+                  Cadastrar
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -64,22 +66,35 @@ const Index = () => {
                 Plataforma visual que ajuda equipes a definir metas claras, acompanhar o progresso e mensurar resultados de forma eficiente.
               </p>
               <div className="flex gap-4 justify-center md:justify-start pt-4">
-                <Button 
-                  size="lg" 
-                  className="px-6 py-6 text-lg flex items-center gap-2 shadow-xl bg-gradient-to-r from-nobug-600 to-nobug-500 hover:from-nobug-700 hover:to-nobug-600 border-none transition-all duration-300"
-                  onClick={() => navigate('/register')}
-                >
-                  Começar agora
-                  <ArrowRight className="h-5 w-5" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  className="px-6 py-6 text-lg border-nobug-200 hover:bg-nobug-50/50"
-                  onClick={() => navigate('/login')}
-                >
-                  Fazer login
-                </Button>
+                {isAuthenticated ? (
+                  <Button 
+                    size="lg" 
+                    className="px-6 py-6 text-lg flex items-center gap-2 shadow-xl bg-gradient-to-r from-nobug-600 to-nobug-500 hover:from-nobug-700 hover:to-nobug-600 border-none transition-all duration-300"
+                    onClick={() => navigate('/dashboard')}
+                  >
+                    Ir para Dashboard
+                    <ArrowRight className="h-5 w-5" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      size="lg" 
+                      className="px-6 py-6 text-lg flex items-center gap-2 shadow-xl bg-gradient-to-r from-nobug-600 to-nobug-500 hover:from-nobug-700 hover:to-nobug-600 border-none transition-all duration-300"
+                      onClick={() => navigate('/register')}
+                    >
+                      Começar agora
+                      <ArrowRight className="h-5 w-5" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="lg"
+                      className="px-6 py-6 text-lg border-nobug-200 hover:bg-nobug-50/50"
+                      onClick={() => navigate('/login')}
+                    >
+                      Fazer login
+                    </Button>
+                  </>
+                )}
               </div>
               
               {/* Trust indicators */}
@@ -174,24 +189,39 @@ const Index = () => {
             <div className="bg-nobug-50/50 backdrop-blur-sm p-8 md:p-12 rounded-2xl border border-nobug-100/30 shadow-lg">
               <h2 className="text-3xl font-bold mb-6">Pronto para aumentar o foco do seu time?</h2>
               <p className="text-xl text-gray-600 mb-10">
-                Cadastre-se no Nobug OKRs e comece hoje mesmo a acompanhar objetivos e resultados com eficiência.
+                {isAuthenticated 
+                  ? "Continue gerenciando seus OKRs e alcance resultados extraordinários."
+                  : "Cadastre-se no Nobug OKRs e comece hoje mesmo a acompanhar objetivos e resultados com eficiência."
+                }
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button 
-                  size="lg"
-                  onClick={() => navigate('/register')}
-                  className="px-8 py-6 text-lg shadow-lg bg-gradient-to-r from-nobug-600 to-nobug-500 hover:from-nobug-700 hover:to-nobug-600 border-none transition-all duration-300"
-                >
-                  Começar gratuitamente
-                </Button>
-                <Button 
-                  variant="outline"
-                  size="lg"
-                  onClick={() => navigate('/login')}
-                  className="px-8 py-6 text-lg border-nobug-200 hover:bg-nobug-50/80"
-                >
-                  Fazer login
-                </Button>
+                {isAuthenticated ? (
+                  <Button 
+                    size="lg"
+                    onClick={() => navigate('/dashboard')}
+                    className="px-8 py-6 text-lg shadow-lg bg-gradient-to-r from-nobug-600 to-nobug-500 hover:from-nobug-700 hover:to-nobug-600 border-none transition-all duration-300"
+                  >
+                    Ir para Dashboard
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      size="lg"
+                      onClick={() => navigate('/register')}
+                      className="px-8 py-6 text-lg shadow-lg bg-gradient-to-r from-nobug-600 to-nobug-500 hover:from-nobug-700 hover:to-nobug-600 border-none transition-all duration-300"
+                    >
+                      Começar gratuitamente
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="lg"
+                      onClick={() => navigate('/login')}
+                      className="px-8 py-6 text-lg border-nobug-200 hover:bg-nobug-50/80"
+                    >
+                      Fazer login
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

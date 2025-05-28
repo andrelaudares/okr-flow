@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from supabase import Client, create_client
 import traceback
+import time
 
 from .utils.supabase import supabase_client, supabase_admin
 from .models.user import UserProfile
@@ -13,7 +14,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
     """
     Dependency para obter o usuário logado com base no token JWT.
-    Simplificado para não depender de expiração automática.
+    Tokens têm duração de 7 dias por padrão no Supabase.
     """
     try:
         print(f"DEBUG: Validando token JWT...")
@@ -31,21 +32,32 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
             user_auth_response = supabase_client.auth.get_user(jwt=token)
             
             if not user_auth_response or not user_auth_response.user:
+                print(f"DEBUG: Token inválido ou usuário não encontrado")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token inválido",
+                    detail="Token inválido ou expirado",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
                 
             user_id = user_auth_response.user.id
             print(f"DEBUG: Token válido para usuário: {user_id}")
             
+            # Verificar se o token não está muito próximo da expiração
+            user_metadata = user_auth_response.user
+            if hasattr(user_metadata, 'exp'):
+                current_time = int(time.time())
+                token_exp = getattr(user_metadata, 'exp', current_time + 3600)
+                
+                # Se o token expira em menos de 1 hora, sugerir refresh
+                if token_exp - current_time < 3600:
+                    print(f"DEBUG: Token próximo da expiração. Exp: {token_exp}, Current: {current_time}")
+            
         except Exception as e_auth:
             print(f"DEBUG: Erro na validação do token: {e_auth}")
             # Se der qualquer erro de autenticação, consideramos inválido
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido ou expirado",
+                detail="Token inválido ou expirado. Faça login novamente.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -72,7 +84,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
                 print(f"DEBUG: Usuário {user_id} está desativado")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Usuário desativado",
+                    detail="Usuário desativado. Entre em contato com o administrador.",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
             
@@ -96,7 +108,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor na autenticação"
+            detail="Erro interno do servidor"
         )
 
 

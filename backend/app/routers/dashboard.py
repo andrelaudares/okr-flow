@@ -153,10 +153,31 @@ async def get_active_cycle_status(company_id: str) -> Optional[CycleStatus]:
         print(f"DEBUG: Erro ao buscar ciclo ativo: {e}")
         return None
 
+async def get_all_company_cycles(company_id: str) -> List[CycleStatus]:
+    """Busca todos os ciclos da empresa com status calculado"""
+    try:
+        from .cycles import calculate_cycle_status
+        
+        response = supabase_admin.from_('cycles').select(
+            "id, name, start_date, end_date, is_active, created_at, updated_at"
+        ).eq('company_id', company_id).order('created_at', desc=True).execute()
+        
+        if response.data:
+            cycles = []
+            for cycle_data in response.data:
+                cycle_status = calculate_cycle_status(cycle_data)
+                cycles.append(cycle_status)
+            return cycles
+        
+        return []
+    except Exception as e:
+        print(f"DEBUG: Erro ao buscar ciclos da empresa: {e}")
+        return []
+
 @router.get("/time-cards", response_model=TimeCardsResponse, summary="Cards temporais do dashboard")
 async def get_time_cards(current_user: UserProfile = Depends(get_current_user)):
     """
-    Retorna todos os cards temporais disponíveis, as preferências do usuário e o ciclo ativo.
+    Retorna todos os cards temporais disponíveis, as preferências do usuário, o ciclo ativo e todos os ciclos.
     """
     try:
         if not current_user.company_id:
@@ -179,10 +200,14 @@ async def get_time_cards(current_user: UserProfile = Depends(get_current_user)):
         # Buscar ciclo ativo
         active_cycle = await get_active_cycle_status(str(current_user.company_id))
         
+        # Buscar todos os ciclos da empresa
+        all_cycles = await get_all_company_cycles(str(current_user.company_id))
+        
         return TimeCardsResponse(
             available_cards=available_cards,
             user_preferences=user_preferences,
-            active_cycle=active_cycle
+            active_cycle=active_cycle,
+            all_cycles=all_cycles
         )
         
     except HTTPException:
