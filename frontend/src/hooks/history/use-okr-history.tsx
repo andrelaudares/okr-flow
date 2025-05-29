@@ -1,16 +1,31 @@
-
 import { useMemo, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchObjectivesForHistory, fetchHistoryRecords } from './fetch-history-data';
 import { generateObjectiveHistory, calculateOverallProgressHistory } from './history-processors';
 import { ObjectiveHistoryData, HistoryDataPoint, DateRangeFilter } from './types';
 import { useObjectives } from '@/hooks/use-objectives';
 import { useDashboardObjectives } from '@/hooks/use-dashboard-objectives';
 import { filterByDateRange } from './history-filters';
-import { recordObjectiveHistory } from '@/utils/supabase/history';
 import { toast } from 'sonner';
 
 export type { HistoryDataPoint, ObjectiveHistoryData };
+
+// Mock function to replace Supabase fetch
+const fetchObjectivesForHistory = async () => {
+  // TODO: Implementar com a nova API quando necessário
+  return [];
+};
+
+// Mock function to replace Supabase fetch
+const fetchHistoryRecords = async () => {
+  // TODO: Implementar com a nova API quando necessário
+  return [];
+};
+
+// Mock function to replace Supabase record
+const recordObjectiveHistory = async (objectiveId: string, progress: number) => {
+  // TODO: Implementar com a nova API quando necessário
+  console.log('Recording history for objective:', objectiveId, 'progress:', progress);
+};
 
 export const useOkrHistory = () => {
   const [forceRefresh, setForceRefresh] = useState(0);
@@ -23,22 +38,24 @@ export const useOkrHistory = () => {
   // Get information about data source
   const { isUsingRemoteData } = useDashboardObjectives();
 
-  // Fetch all objectives with their activities from Supabase
+  // Fetch all objectives with their activities (disabled for now)
   const { 
     data: remoteObjectives = [], 
     isLoading: isLoadingObjectives,
   } = useQuery({
     queryKey: ['objectives-history', forceRefresh],
     queryFn: fetchObjectivesForHistory,
+    enabled: false, // Disabled until API is implemented
   });
 
-  // Fetch historical progress data
+  // Fetch historical progress data (disabled for now)
   const { 
     data: rawHistoryData = [], 
     isLoading: isLoadingHistory,
   } = useQuery({
     queryKey: ['objectives-progress-history', forceRefresh],
     queryFn: fetchHistoryRecords,
+    enabled: false, // Disabled until API is implemented
   });
 
   // Transform raw history data to match HistoryDataPoint type
@@ -51,7 +68,7 @@ export const useOkrHistory = () => {
     }));
   }, [rawHistoryData]);
 
-  // Mutation for updating history
+  // Mutation for updating history (disabled for now)
   const { mutate: updateHistory, isPending: isUpdating } = useMutation({
     mutationFn: async ({ objectiveId, progress }: { objectiveId: string, progress: number }) => {
       return await recordObjectiveHistory(objectiveId, progress);

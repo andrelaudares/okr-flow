@@ -295,80 +295,340 @@ class ReportGenerator:
         df.to_excel(writer, sheet_name='Key Results', index=False)
     
     def _generate_pdf(self, content: ReportContent, file_id: str) -> str:
-        """Gerar relatório PDF"""
+        """Gerar relatório PDF profissional e bem estruturado"""
         if not REPORTLAB_AVAILABLE:
             raise ValueError("ReportLab não disponível para geração de PDF")
         
         filename = f"relatorio_{file_id}.pdf"
         filepath = os.path.join(self.output_dir, filename)
         
-        doc = SimpleDocTemplate(filepath, pagesize=A4)
+        doc = SimpleDocTemplate(
+            filepath, 
+            pagesize=A4,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18
+        )
+        
         styles = getSampleStyleSheet()
         story = []
         
-        # Título
+        # Estilos customizados
         title_style = ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=18,
+            fontSize=24,
             spaceAfter=30,
+            alignment=TA_CENTER,
+            textColor=colors.HexColor('#1f2937')
+        )
+        
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Heading2'],
+            fontSize=16,
+            spaceAfter=20,
+            spaceBefore=20,
+            textColor=colors.HexColor('#374151'),
+            borderWidth=1,
+            borderColor=colors.HexColor('#e5e7eb'),
+            borderPadding=10,
+            backColor=colors.HexColor('#f9fafb')
+        )
+        
+        section_style = ParagraphStyle(
+            'SectionHeader',
+            parent=styles['Heading3'],
+            fontSize=14,
+            spaceAfter=12,
+            spaceBefore=16,
+            textColor=colors.HexColor('#4f46e5'),
+            borderWidth=0,
+            borderColor=colors.HexColor('#4f46e5'),
+            leftIndent=0
+        )
+        
+        info_style = ParagraphStyle(
+            'InfoText',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#6b7280'),
+            spaceAfter=6
+        )
+        
+        # Cabeçalho do relatório
+        story.append(Paragraph("📊 Relatório OKR", title_style))
+        
+        if content.dashboard_data:
+            # Informações básicas em uma tabela elegante
+            info_data = [
+                ['🏢 Empresa', content.dashboard_data.company_name],
+                ['📅 Período', content.dashboard_data.report_period],
+                ['🕒 Gerado em', content.dashboard_data.generation_date.strftime('%d/%m/%Y às %H:%M')],
+                ['👥 Usuários Ativos', str(content.dashboard_data.active_users)],
+                ['🎯 Ciclo Ativo', content.dashboard_data.active_cycle_name or 'Nenhum ciclo ativo']
+            ]
+            
+            info_table = Table(info_data, colWidths=[2*inch, 3*inch])
+            info_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+                ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#374151')),
+                ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#1f2937')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+            ]))
+            
+            story.append(info_table)
+            story.append(Spacer(1, 30))
+            
+            # Resumo Executivo com métricas destacadas
+            story.append(Paragraph("📈 Resumo Executivo", subtitle_style))
+            
+            # Métricas principais em cards
+            metrics_data = [
+                ['Métrica', 'Valor', 'Status'],
+                [
+                    '🎯 Total de Objetivos', 
+                    str(content.dashboard_data.total_objectives),
+                    '✅' if content.dashboard_data.total_objectives > 0 else '⚠️'
+                ],
+                [
+                    '🔑 Total de Key Results', 
+                    str(content.dashboard_data.total_key_results),
+                    '✅' if content.dashboard_data.total_key_results > 0 else '⚠️'
+                ],
+                [
+                    '📊 Progresso Geral', 
+                    f"{content.dashboard_data.overall_progress:.1f}%",
+                    '🟢' if content.dashboard_data.overall_progress >= 70 else '🟡' if content.dashboard_data.overall_progress >= 40 else '🔴'
+                ],
+                [
+                    '✅ Taxa de Conclusão', 
+                    f"{content.dashboard_data.completion_rate:.1f}%",
+                    '🟢' if content.dashboard_data.completion_rate >= 80 else '🟡' if content.dashboard_data.completion_rate >= 50 else '🔴'
+                ],
+                [
+                    '⏰ Taxa No Prazo', 
+                    f"{content.dashboard_data.on_track_rate:.1f}%",
+                    '🟢' if content.dashboard_data.on_track_rate >= 80 else '🟡' if content.dashboard_data.on_track_rate >= 50 else '🔴'
+                ]
+            ]
+            
+            metrics_table = Table(metrics_data, colWidths=[2.5*inch, 1.5*inch, 1*inch])
+            metrics_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4f46e5')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'),
+                ('ALIGN', (2, 1), (2, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, 0), 12),
+                ('FONTSIZE', (0, 1), (-1, -1), 11),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                ('TOPPADDING', (0, 0), (-1, -1), 10),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e5e7eb')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')])
+            ]))
+            
+            story.append(metrics_table)
+            story.append(Spacer(1, 20))
+            
+            # Distribuição por Status
+            if content.dashboard_data.objectives_by_status:
+                story.append(Paragraph("📋 Distribuição de Objetivos por Status", section_style))
+                
+                status_data = [['Status', 'Quantidade', 'Percentual']]
+                total_objectives = content.dashboard_data.total_objectives
+                
+                status_icons = {
+                    'PLANNED': '📋',
+                    'ON_TRACK': '🟢',
+                    'AT_RISK': '🟡',
+                    'BEHIND': '🔴',
+                    'COMPLETED': '✅'
+                }
+                
+                status_names = {
+                    'PLANNED': 'Planejado',
+                    'ON_TRACK': 'No Prazo',
+                    'AT_RISK': 'Em Risco',
+                    'BEHIND': 'Atrasado',
+                    'COMPLETED': 'Concluído'
+                }
+                
+                for status, count in content.dashboard_data.objectives_by_status.items():
+                    percentage = (count / total_objectives * 100) if total_objectives > 0 else 0
+                    icon = status_icons.get(status, '📌')
+                    name = status_names.get(status, status)
+                    status_data.append([
+                        f"{icon} {name}",
+                        str(count),
+                        f"{percentage:.1f}%"
+                    ])
+                
+                status_table = Table(status_data, colWidths=[2*inch, 1*inch, 1*inch])
+                status_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6b7280')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 11),
+                    ('FONTSIZE', (0, 1), (-1, -1), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+                ]))
+                
+                story.append(status_table)
+                story.append(Spacer(1, 25))
+        
+        # Objetivos Detalhados
+        if content.objectives:
+            story.append(Paragraph("🎯 Objetivos Detalhados", subtitle_style))
+            
+            for i, obj in enumerate(content.objectives[:10]):  # Limitamos a 10 para não ficar muito longo
+                # Card do objetivo
+                obj_title = f"🎯 {obj.title}"
+                story.append(Paragraph(obj_title, section_style))
+                
+                # Informações do objetivo em tabela
+                obj_info = [
+                    ['👤 Responsável', obj.owner_name or 'Não atribuído'],
+                    ['🔄 Ciclo', obj.cycle_name],
+                    ['📊 Status', self._get_status_display(obj.status)],
+                    ['📈 Progresso', f"{obj.progress:.1f}%"],
+                    ['🔑 Key Results', f"{obj.key_results_completed}/{obj.key_results_count} concluídos"]
+                ]
+                
+                if obj.description:
+                    obj_info.append(['📝 Descrição', obj.description[:100] + '...' if len(obj.description) > 100 else obj.description])
+                
+                obj_table = Table(obj_info, colWidths=[1.5*inch, 3.5*inch])
+                obj_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fafafa')),
+                    ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#4b5563')),
+                    ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#1f2937')),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                ]))
+                
+                story.append(obj_table)
+                
+                # Barra de progresso visual
+                progress_width = 4 * inch
+                progress_height = 0.2 * inch
+                progress_percent = obj.progress / 100
+                
+                # Criar uma mini-tabela para simular barra de progresso
+                progress_data = [['']]
+                progress_table = Table(progress_data, colWidths=[progress_width], rowHeights=[progress_height])
+                
+                # Cor baseada no progresso
+                if obj.progress >= 80:
+                    progress_color = colors.HexColor('#10b981')  # Verde
+                elif obj.progress >= 60:
+                    progress_color = colors.HexColor('#f59e0b')  # Amarelo
+                else:
+                    progress_color = colors.HexColor('#ef4444')  # Vermelho
+                
+                progress_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#e5e7eb')),
+                    ('GRID', (0, 0), (0, 0), 1, colors.HexColor('#d1d5db'))
+                ]))
+                
+                story.append(Spacer(1, 5))
+                story.append(progress_table)
+                story.append(Spacer(1, 15))
+                
+                # Quebra de página a cada 3 objetivos
+                if (i + 1) % 3 == 0 and i < len(content.objectives) - 1:
+                    story.append(Spacer(1, 20))
+        
+        # Key Results (se incluídos)
+        if content.key_results and len(content.key_results) > 0:
+            story.append(Paragraph("🔑 Key Results em Destaque", subtitle_style))
+            
+            # Mostrar apenas os top 5 Key Results
+            top_krs = sorted(content.key_results, key=lambda kr: kr.progress, reverse=True)[:5]
+            
+            kr_data = [['Key Result', 'Objetivo', 'Progresso', 'Status']]
+            
+            for kr in top_krs:
+                kr_data.append([
+                    kr.title[:30] + '...' if len(kr.title) > 30 else kr.title,
+                    kr.objective_title[:25] + '...' if len(kr.objective_title) > 25 else kr.objective_title,
+                    f"{kr.progress:.1f}%",
+                    self._get_status_display(kr.status)
+                ])
+            
+            kr_table = Table(kr_data, colWidths=[2*inch, 1.8*inch, 0.8*inch, 1*inch])
+            kr_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (2, 1), (2, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 11),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')])
+            ]))
+            
+            story.append(kr_table)
+        
+        # Rodapé
+        story.append(Spacer(1, 30))
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.HexColor('#9ca3af'),
             alignment=TA_CENTER
         )
         
-        story.append(Paragraph("Relatório OKR", title_style))
-        
-        # Informações do relatório
-        if content.dashboard_data:
-            story.append(Paragraph(f"<b>Empresa:</b> {content.dashboard_data.company_name}", styles['Normal']))
-            story.append(Paragraph(f"<b>Período:</b> {content.dashboard_data.report_period}", styles['Normal']))
-            story.append(Paragraph(f"<b>Gerado em:</b> {content.dashboard_data.generation_date.strftime('%d/%m/%Y às %H:%M')}", styles['Normal']))
-            story.append(Spacer(1, 20))
-            
-            # Resumo executivo
-            story.append(Paragraph("Resumo Executivo", styles['Heading2']))
-            
-            summary_data = [
-                ['Métrica', 'Valor'],
-                ['Total de Objetivos', str(content.dashboard_data.total_objectives)],
-                ['Total de Key Results', str(content.dashboard_data.total_key_results)],
-                ['Usuários Ativos', str(content.dashboard_data.active_users)],
-                ['Progresso Geral', f"{content.dashboard_data.overall_progress:.1f}%"],
-                ['Taxa de Conclusão', f"{content.dashboard_data.completion_rate:.1f}%"],
-                ['Taxa No Prazo', f"{content.dashboard_data.on_track_rate:.1f}%"]
-            ]
-            
-            summary_table = Table(summary_data)
-            summary_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 12),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            
-            story.append(summary_table)
-            story.append(Spacer(1, 20))
-        
-        # Objetivos
-        if content.objectives:
-            story.append(Paragraph("Objetivos", styles['Heading2']))
-            
-            for obj in content.objectives[:5]:  # Limitamos a 5 para não ficar muito longo
-                story.append(Paragraph(f"<b>{obj.title}</b>", styles['Heading3']))
-                story.append(Paragraph(f"Responsável: {obj.owner_name or 'Não atribuído'}", styles['Normal']))
-                story.append(Paragraph(f"Status: {obj.status} | Progresso: {obj.progress:.1f}%", styles['Normal']))
-                story.append(Paragraph(f"Key Results: {obj.key_results_completed}/{obj.key_results_count} concluídos", styles['Normal']))
-                if obj.description:
-                    story.append(Paragraph(f"Descrição: {obj.description}", styles['Normal']))
-                story.append(Spacer(1, 10))
+        story.append(Paragraph(
+            f"Relatório gerado automaticamente pelo Sistema OKR • {datetime.now().strftime('%d/%m/%Y às %H:%M')}",
+            footer_style
+        ))
         
         # Build PDF
         doc.build(story)
         
         return filepath
+    
+    def _get_status_display(self, status: str) -> str:
+        """Converter status para exibição com emoji"""
+        status_map = {
+            'PLANNED': '📋 Planejado',
+            'ON_TRACK': '🟢 No Prazo',
+            'AT_RISK': '🟡 Em Risco',
+            'BEHIND': '🔴 Atrasado',
+            'COMPLETED': '✅ Concluído'
+        }
+        return status_map.get(status, f'📌 {status}')
     
     def get_file_size(self, filepath: str) -> int:
         """Obter tamanho do arquivo em bytes"""

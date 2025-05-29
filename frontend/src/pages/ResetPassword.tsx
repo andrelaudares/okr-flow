@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Flag } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -6,7 +5,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { supabase } from '@/integrations/supabase/client';
 
 const ResetPassword = () => {
   const [email, setEmail] = useState("");
@@ -20,19 +18,14 @@ const ResetPassword = () => {
     setIsLoading(true);
     
     try {
-      // Use Supabase to send a password reset email
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-confirmation`,
-      });
+      // TODO: Implementar reset de senha com a nova API
+      // Por enquanto, apenas simula o envio
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (error) {
-        throw error;
-      }
-      
-      toast.success("Email de redefinição enviado com sucesso!");
+      toast.success("Funcionalidade em desenvolvimento. Entre em contato com o administrador.");
       setResetSent(true);
     } catch (error: any) {
-      toast.error(error.message || "Erro ao enviar email de redefinição");
+      toast.error("Erro ao enviar email de redefinição");
       console.error("Error in password reset:", error);
     } finally {
       setIsLoading(false);
@@ -58,7 +51,7 @@ const ResetPassword = () => {
             <CardTitle className="text-2xl font-bold text-center">Recuperar senha</CardTitle>
             <CardDescription className="text-center">
               {resetSent 
-                ? "Instruções enviadas para seu email" 
+                ? "Funcionalidade em desenvolvimento" 
                 : "Insira seu email para receber instruções de recuperação"}
             </CardDescription>
           </CardHeader>
@@ -66,8 +59,8 @@ const ResetPassword = () => {
             {resetSent ? (
               <div className="text-center space-y-4">
                 <p className="text-sm text-gray-500">
-                  Enviamos um email com instruções para redefinir sua senha. 
-                  Por favor, verifique sua caixa de entrada.
+                  Esta funcionalidade está em desenvolvimento. 
+                  Por favor, entre em contato com o administrador do sistema.
                 </p>
                 <Button 
                   onClick={() => navigate("/login")} 

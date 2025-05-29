@@ -1,22 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DashboardInfoCards from '@/components/okr/DashboardInfoCards';
+import DashboardStatsCards from '@/components/dashboard/DashboardStatsCards';
 import ObjectiveFilters from '@/components/objectives/ObjectiveFilters';
 import ObjectiveCard from '@/components/objectives/ObjectiveCard';
 import ObjectiveForm from '@/components/objectives/ObjectiveForm';
+import ExportButton from '@/components/reports/ExportButton';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { useObjectives, useObjectiveFilters } from '@/hooks/use-objectives';
 import { usePermissions } from '@/hooks/use-auth';
 import { 
   LayoutDashboard, 
   Plus, 
   Target, 
-  TrendingUp, 
-  Users, 
-  Calendar,
-  FileText,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -34,16 +30,12 @@ const Dashboard = () => {
     objectives, 
     total, 
     hasMore, 
-    stats,
     isLoading, 
-    isLoadingStats,
     isCreating,
     isUpdating,
-    isDeleting,
     createObjective,
     updateObjective,
-    deleteObjective,
-    refetch 
+    deleteObjective
   } = useObjectives(filters);
 
   const [showObjectiveForm, setShowObjectiveForm] = useState(false);
@@ -86,74 +78,22 @@ const Dashboard = () => {
     <ErrorBoundary>
       <div className="container py-6 px-4 md:px-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-2 mb-6 animate-fade-in">
-          <div className="bg-nobug-100 p-2 rounded-lg">
-            <LayoutDashboard className="h-5 w-5 text-nobug-600" />
+        <div className="flex items-center justify-between mb-6 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <div className="bg-nobug-100 p-2 rounded-lg">
+              <LayoutDashboard className="h-5 w-5 text-nobug-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
+          
+          {/* Botão de exportação */}
+          <ExportButton />
         </div>
         
-        {/* Cards Temporais */}
+        {/* Cards de Estatísticas e Progresso */}
         <div className="bg-gradient-to-br from-white to-blue-50/30 rounded-xl p-4 shadow-sm mb-8">
-          <DashboardInfoCards objectives={objectives} />
+          <DashboardStatsCards />
         </div>
-
-        {/* Estatísticas */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Objetivos</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.total_objectives}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.completed_count} concluídos
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Progresso Médio</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{Math.round(stats.average_progress)}%</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.in_progress_count} em andamento
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">No Prazo</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.by_status.ON_TRACK}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.by_status.AT_RISK} em risco
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Planejados</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.planned_count}</div>
-                <p className="text-xs text-muted-foreground">
-                  {stats.by_status.BEHIND} atrasados
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         {/* Header dos Objetivos */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">

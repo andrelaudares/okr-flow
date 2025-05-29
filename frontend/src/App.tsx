@@ -13,7 +13,6 @@ import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import CompanySettings from "./pages/CompanySettings";
 import Cycles from "./pages/cycles/Cycles";
-import Objectives from "./pages/objectives/Objectives";
 import ObjectiveKeyResults from "./pages/objectives/ObjectiveKeyResults";
 import CompanySettingsPage from "./pages/company/CompanySettings";
 import TestSimple from "./pages/TestSimple";
@@ -98,11 +97,6 @@ const AppRoutes = () => {
       <Route path="/cycles" element={
         <ProtectedRoute>
           <Cycles />
-        </ProtectedRoute>
-      } />
-      <Route path="/objectives" element={
-        <ProtectedRoute>
-          <Objectives />
         </ProtectedRoute>
       } />
       <Route path="/objectives/:objectiveId/key-results" element={

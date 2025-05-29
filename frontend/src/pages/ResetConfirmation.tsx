@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Flag } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { supabase } from '@/integrations/supabase/client';
 
 const ResetConfirmation = () => {
   const [password, setPassword] = useState("");
@@ -31,16 +29,13 @@ const ResetConfirmation = () => {
     setIsLoading(true);
     
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      // TODO: Implementar confirmação de reset de senha com a nova API
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      if (error) {
-        throw error;
-      }
-      
-      toast.success("Senha redefinida com sucesso!");
+      toast.success("Funcionalidade em desenvolvimento. Entre em contato com o administrador.");
       navigate("/login");
     } catch (error: any) {
-      toast.error(error.message || "Erro ao redefinir a senha");
+      toast.error("Erro ao redefinir a senha");
       console.error("Error in password reset confirmation:", error);
     } finally {
       setIsLoading(false);
@@ -65,41 +60,22 @@ const ResetConfirmation = () => {
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold text-center">Nova senha</CardTitle>
             <CardDescription className="text-center">
-              Digite e confirme sua nova senha
+              Funcionalidade em desenvolvimento
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleResetPassword}>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Nova senha
-                  </label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="confirmPassword" className="text-sm font-medium">
-                    Confirme a nova senha
-                  </label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-                <Button disabled={isLoading} className="w-full">
-                  {isLoading ? "Confirmando..." : "Confirmar nova senha"}
-                </Button>
-              </div>
-            </form>
+            <div className="text-center space-y-4">
+              <p className="text-sm text-gray-500">
+                Esta funcionalidade está em desenvolvimento. 
+                Por favor, entre em contato com o administrador do sistema.
+              </p>
+              <Button 
+                onClick={() => navigate("/login")} 
+                className="w-full"
+              >
+                Voltar para o login
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -61,17 +61,6 @@ const Navbar = () => {
                   </NavigationMenuLink>
                 </Link>
                 
-                <Link to="/objectives">
-                  <NavigationMenuLink 
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      isActive('/objectives') && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    Objetivos
-                  </NavigationMenuLink>
-                </Link>
-                
                 {(isOwner || isAdmin) && (
                   <Link to="/cycles">
                     <NavigationMenuLink 
@@ -85,16 +74,7 @@ const Navbar = () => {
                   </Link>
                 )}
                 
-                <Link to="/history">
-                  <NavigationMenuLink 
-                    className={cn(
-                      navigationMenuTriggerStyle(),
-                      isActive('/history') && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    Histórico
-                  </NavigationMenuLink>
-                </Link>
+                
                 
                 <Link to="/users">
                   <NavigationMenuLink 
