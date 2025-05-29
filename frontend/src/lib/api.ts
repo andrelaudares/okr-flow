@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 
 // Base URL do backend - detecta automaticamente o ambiente
 const BASE_URL = import.meta.env.PROD 
-  ? 'https://b603-2804-14c-485-80f3-1561-7e78-e258-3c84.ngrok-free.app' // Você vai precisar atualizar com a URL real do seu backend
+  ? 'https://8bb0-2804-14c-485-80f3-1561-7e78-e258-3c84.ngrok-free.app' // Atualizado pelo ngrok
   : 'http://localhost:8000';
 
 // Interface para resposta de erro da API
