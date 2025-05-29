@@ -34,17 +34,22 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     const maxAttempts = 30; // 30 tentativas = 30 segundos máximo
     let attempts = 0;
     
+    console.log(`Iniciando polling para relatório ${reportId} (formato: ${format})`);
+    
     const poll = async (): Promise<void> => {
       attempts++;
+      console.log(`Tentativa ${attempts}/${maxAttempts} - Verificando status do relatório ${reportId}`);
       
       try {
         const report = await getReportStatus(reportId);
+        console.log(`Status do relatório:`, report);
         
         if (!report) {
           throw new Error('Relatório não encontrado');
         }
         
         if (report.status === 'COMPLETED') {
+          console.log(`Relatório ${reportId} concluído! Iniciando download...`);
           // Download automático
           await downloadReport(reportId);
           toast.success(`Relatório ${format} baixado com sucesso!`);
@@ -61,6 +66,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
         
         // Continuar polling se ainda está processando
         if (report.status === 'PENDING' || report.status === 'PROCESSING') {
+          console.log(`Relatório ainda processando (${report.status}). Aguardando 1 segundo...`);
           setTimeout(poll, 1000); // Verificar novamente em 1 segundo
         }
         
@@ -75,6 +81,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
   };
 
   const handleExport = async (format: 'CSV' | 'PDF') => {
+    console.log(`Iniciando exportação no formato ${format}`);
     setIsExporting(true);
     setExportingFormat(format);
     
@@ -94,13 +101,18 @@ const ExportButton: React.FC<ExportButtonProps> = ({
         include_charts: format === 'PDF'
       };
 
+      console.log('Configuração do relatório:', config);
+      
       const reportId = await exportReport(config);
+      console.log('ID do relatório retornado:', reportId);
       
       if (reportId) {
         toast.success(`Gerando relatório ${format}... O download iniciará automaticamente.`);
         
         // Iniciar polling para verificar status e fazer download automático
         await pollReportStatus(reportId, format);
+      } else {
+        throw new Error('Não foi possível obter o ID do relatório');
       }
       
     } catch (error) {

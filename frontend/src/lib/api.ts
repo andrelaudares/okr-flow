@@ -1,8 +1,10 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { toast } from 'sonner';
 
-// Base URL do backend
-const BASE_URL = 'http://localhost:8000';
+// Base URL do backend - detecta automaticamente o ambiente
+const BASE_URL = import.meta.env.PROD 
+  ? 'https://seu-backend-url.vercel.app' // Você vai precisar atualizar com a URL real do seu backend
+  : 'http://localhost:8000';
 
 // Interface para resposta de erro da API
 interface ApiErrorResponse {

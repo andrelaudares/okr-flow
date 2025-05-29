@@ -41,11 +41,12 @@ export interface Report {
 export interface ReportsResponse {
   reports: Report[];
   total: number;
-  has_more: boolean;
+  has_more?: boolean;
 }
 
 export interface ExportResponse {
-  report_id: string;
+  id: string;
   status: string;
   message: string;
+  estimated_time?: number;
 } 

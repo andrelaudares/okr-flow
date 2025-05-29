@@ -82,15 +82,15 @@ export const useReports = (): UseReportsReturn => {
     setError(null);
     
     try {
+      console.log('Enviando configuração de relatório:', config);
       const response = await api.post('/api/reports/export', config);
       const data: ExportResponse = response.data;
       
-      toast.success('Relatório sendo gerado! Você será notificado quando estiver pronto.');
+      console.log('Resposta da API:', data);
       
-      // Refresh reports list
-      await getReports();
+      // Não mostrar toast aqui, será mostrado no componente
       
-      return data.report_id;
+      return data.id;
     } catch (err: any) {
       console.error('Erro ao exportar relatório:', err);
       const errorMessage = err.response?.data?.detail || 'Erro ao exportar relatório';

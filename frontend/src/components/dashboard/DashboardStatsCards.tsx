@@ -6,16 +6,19 @@ import {
   Target, 
   Activity,
   Calendar,
-  ChevronDown,
-  RefreshCw
+  RefreshCw,
+  ArrowUpDown,
+  Clock
 } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { useDashboardStats } from '@/hooks/dashboard/useDashboardStats';
 import { useCycles } from '@/hooks/use-cycles';
 import { usePermissions } from '@/hooks/use-auth';
@@ -24,6 +27,7 @@ import ObjectivesCountCard from './ObjectivesCountCard';
 import { Loading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import type { DashboardStats } from '@/types/dashboard';
+import type { Cycle } from '@/types/cycles';
 
 interface DashboardStatsCardsProps {
   className?: string;
@@ -45,24 +49,32 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
     cycles, 
     activeCycle, 
     isActivating, 
-    activateCycle 
+    activateCycle,
+    isLoadingActive 
   } = useCycles();
 
   const { isOwner, isAdmin } = usePermissions();
   const canManageCycles = isOwner || isAdmin;
 
   const [isChangingCycle, setIsChangingCycle] = useState(false);
+  const [showCycleDialog, setShowCycleDialog] = useState(false);
 
-  const handleChangeCycle = async (cycleId: string) => {
+  const handleChangeCycle = async (cycle: Cycle) => {
     if (!canManageCycles) {
       toast.error('Você não tem permissão para alterar o ciclo ativo');
       return;
     }
 
+    if (cycle.id === activeCycle?.id) {
+      setShowCycleDialog(false);
+      return;
+    }
+
     setIsChangingCycle(true);
     try {
-      await activateCycle(cycleId);
-      toast.success('Ciclo ativo alterado com sucesso!');
+      await activateCycle(cycle.id);
+      toast.success(`Ciclo "${cycle.name}" ativado com sucesso!`);
+      setShowCycleDialog(false);
     } catch (error) {
       console.error('Erro ao alterar ciclo:', error);
       toast.error('Erro ao alterar ciclo ativo');
@@ -75,6 +87,21 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
     return cycles.filter(cycle => 
       cycle.status === 'PLANNED' || cycle.status === 'ACTIVE'
     );
+  };
+
+  const getStatusBadge = (cycle: Cycle) => {
+    switch (cycle.status) {
+      case 'ACTIVE':
+        return <Badge className="bg-green-100 text-green-800 text-xs">Ativo</Badge>;
+      case 'PLANNED':
+        return <Badge className="bg-blue-100 text-blue-800 text-xs">Planejado</Badge>;
+      case 'COMPLETED':
+        return <Badge className="bg-gray-100 text-gray-800 text-xs">Concluído</Badge>;
+      case 'EXPIRED':
+        return <Badge className="bg-red-100 text-red-800 text-xs">Expirado</Badge>;
+      default:
+        return <Badge variant="secondary" className="text-xs">{cycle.status}</Badge>;
+    }
   };
 
   if (error) {
@@ -145,69 +172,105 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
           </CardContent>
         </Card>
 
-        {/* Ciclo Ativo com Seletor */}
+        {/* Ciclo Ativo - Layout Melhorado */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ciclo Ativo</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              {canManageCycles && getAvailableCycles().length > 1 && (
+                <Dialog open={showCycleDialog} onOpenChange={setShowCycleDialog}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0 hover:bg-gray-100"
+                      disabled={isChangingCycle || isActivating}
+                      title="Trocar ciclo ativo"
+                    >
+                      {isChangingCycle || isActivating ? (
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3" />
+                      )}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Trocar Ciclo Ativo</DialogTitle>
+                      <DialogDescription>
+                        Selecione qual ciclo você deseja ativar. O ciclo atual será desativado.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 mt-4">
+                      {getAvailableCycles().map((cycle) => (
+                        <div
+                          key={cycle.id}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                            cycle.id === activeCycle?.id 
+                              ? 'border-nobug-500 bg-nobug-50' 
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                          onClick={() => handleChangeCycle(cycle)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{cycle.name}</span>
+                                {getStatusBadge(cycle)}
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {new Date(cycle.start_date).toLocaleDateString('pt-BR')} - {' '}
+                                {new Date(cycle.end_date).toLocaleDateString('pt-BR')}
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1">
+                                {cycle.progress_percentage.toFixed(1)}% • {cycle.days_remaining} dias restantes
+                              </div>
+                            </div>
+                            {cycle.id === activeCycle?.id && (
+                              <div className="text-nobug-600 font-medium text-sm">
+                                Atual
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </CardHeader>
-          <CardContent>
-            {isLoadingStats ? (
+          <CardContent className="space-y-3">
+            {isLoadingActive ? (
               <div className="space-y-2">
                 <div className="h-6 bg-gray-200 rounded animate-pulse" />
                 <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                <div className="h-2 bg-gray-200 rounded animate-pulse" />
               </div>
             ) : activeCycle ? (
               <>
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-lg font-bold truncate" title={activeCycle.name}>
-                      {activeCycle.name}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {activeCycle.progress_percentage.toFixed(1)}% do tempo decorrido
-                    </p>
-                  </div>
-                  
-                  {canManageCycles && getAvailableCycles().length > 1 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="ml-2 h-6 w-6 p-0"
-                          disabled={isChangingCycle || isActivating}
-                        >
-                          {isChangingCycle || isActivating ? (
-                            <RefreshCw className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <div className="px-2 py-1.5 text-xs font-medium text-gray-500">
-                          Trocar ciclo ativo
-                        </div>
-                        <DropdownMenuSeparator />
-                        {getAvailableCycles().map((cycle) => (
-                          <DropdownMenuItem
-                            key={cycle.id}
-                            onClick={() => handleChangeCycle(cycle.id)}
-                            disabled={cycle.id === activeCycle.id || isChangingCycle}
-                            className="cursor-pointer"
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{cycle.name}</span>
-                              <span className="text-xs text-gray-500">
-                                {cycle.progress_percentage.toFixed(1)}% • {cycle.days_remaining} dias restantes
-                              </span>
-                            </div>
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                {/* Nome do ciclo */}
+                <div className="text-2xl font-bold truncate" title={activeCycle.name}>
+                  {activeCycle.name}
+                </div>
+                
+                {/* Linha com progresso e dias restantes */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {activeCycle.progress_percentage.toFixed(1)}% decorrido
+                  </span>
+                  <span className="font-medium text-nobug-600">
+                    {activeCycle.days_remaining} dias restantes
+                  </span>
+                </div>
+                
+                {/* Barra de progresso */}
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-nobug-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(activeCycle.progress_percentage, 100)}%` }}
+                  />
                 </div>
               </>
             ) : (
