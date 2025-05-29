@@ -3,6 +3,9 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { TimeCard, TimeCardsResponse, UpdateTimePreferencesData, AvailableCard } from '@/types/time-cards';
 
+// Chave para localStorage
+const CYCLE_PREFERENCES_KEY = 'nobug_okr_cycle_preferences';
+
 // Hook para gestão dos cards temporais
 export const useTimeCards = () => {
   const queryClient = useQueryClient();
@@ -23,10 +26,38 @@ export const useTimeCards = () => {
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
+  // Funções para gerenciar preferências de ciclos localmente
+  const getLocalCyclePreferences = (): string[] => {
+    try {
+      const stored = localStorage.getItem(CYCLE_PREFERENCES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const setLocalCyclePreferences = (cycleIds: string[]) => {
+    try {
+      localStorage.setItem(CYCLE_PREFERENCES_KEY, JSON.stringify(cycleIds));
+    } catch (error) {
+      console.error('Erro ao salvar preferências de ciclos:', error);
+    }
+  };
+
   // Mutation para atualizar preferências
   const updatePreferencesMutation = useMutation({
     mutationFn: async (data: UpdateTimePreferencesData): Promise<{ message: string }> => {
-      const response = await api.put('/api/dashboard/time-preferences', data);
+      // Separar cards temporais e ciclos
+      const timeCards = data.selected_cards.filter(card => !card.startsWith('CYCLE_'));
+      const cycleCards = data.selected_cards.filter(card => card.startsWith('CYCLE_'));
+      
+      // Salvar ciclos localmente
+      setLocalCyclePreferences(cycleCards);
+      
+      // Enviar apenas cards temporais para o backend
+      const response = await api.put('/api/dashboard/time-preferences', { 
+        selected_cards: timeCards 
+      });
       return response.data;
     },
     onSuccess: () => {
@@ -67,23 +98,36 @@ export const useTimeCards = () => {
     return availableCards;
   };
 
-  // Verificar se um card está selecionado
+  // Verificar se um card está selecionado (combinando backend + localStorage)
   const isCardSelected = (cardId: string) => {
+    if (cardId.startsWith('CYCLE_')) {
+      const localCycles = getLocalCyclePreferences();
+      return localCycles.includes(cardId);
+    }
+    
     const selectedCards = timeCardsData?.user_preferences?.selected_cards || [];
     return selectedCards.includes(cardId);
   };
 
+  // Obter todos os cards selecionados (combinando backend + localStorage)
+  const getAllSelectedCards = (): string[] => {
+    const backendCards = timeCardsData?.user_preferences?.selected_cards || [];
+    const localCycles = getLocalCyclePreferences();
+    return [...backendCards, ...localCycles];
+  };
+
   // Obter cards visíveis (selecionados)
   const getVisibleCards = () => {
-    const selectedCards = timeCardsData?.user_preferences?.selected_cards || [];
+    const backendSelectedCards = timeCardsData?.user_preferences?.selected_cards || [];
+    const localSelectedCycles = getLocalCyclePreferences();
     const timeCards = timeCardsData?.time_cards || [];
     const allCycles = timeCardsData?.all_cycles || [];
     
     const visibleCards: (TimeCard & { category: 'temporal' | 'cycle' })[] = [];
 
-    // Adicionar cards temporais selecionados
+    // Adicionar cards temporais selecionados (do backend)
     timeCards.forEach(card => {
-      if (selectedCards.includes(card.type)) {
+      if (backendSelectedCards.includes(card.type)) {
         visibleCards.push({
           ...card,
           category: 'temporal',
@@ -91,10 +135,10 @@ export const useTimeCards = () => {
       }
     });
 
-    // Adicionar ciclos selecionados
+    // Adicionar ciclos selecionados (do localStorage)
     allCycles.forEach(cycle => {
       const cycleId = `CYCLE_${cycle.id}`;
-      if (selectedCards.includes(cycleId)) {
+      if (localSelectedCycles.includes(cycleId)) {
         visibleCards.push({
           type: 'CYCLE',
           title: `Ciclo: ${cycle.name}`,
@@ -113,23 +157,26 @@ export const useTimeCards = () => {
     return visibleCards;
   };
 
-  // Verificar se pode adicionar mais cards (máximo 3 ciclos)
+  // Verificar se pode adicionar mais cards (máximo 2 ciclos)
   const canAddMoreCycles = () => {
-    const selectedCards = timeCardsData?.user_preferences?.selected_cards || [];
-    const selectedCycles = selectedCards.filter(card => card.startsWith('CYCLE_'));
-    return selectedCycles.length < 3;
+    const localCycles = getLocalCyclePreferences();
+    return localCycles.length < 2;
   };
 
   // Obter ciclos selecionados
   const getSelectedCycles = () => {
-    const selectedCards = timeCardsData?.user_preferences?.selected_cards || [];
-    return selectedCards.filter(card => card.startsWith('CYCLE_'));
+    return getLocalCyclePreferences();
+  };
+
+  // Obter contagem de ciclos selecionados
+  const getSelectedCyclesCount = () => {
+    return getLocalCyclePreferences().length;
   };
 
   return {
     // Dados
     timeCards: timeCardsData?.time_cards || [],
-    selectedCards: timeCardsData?.user_preferences?.selected_cards || [],
+    selectedCards: getAllSelectedCards(), // ATUALIZADO: combina backend + localStorage
     activeCycle: timeCardsData?.active_cycle || null,
     allCycles: timeCardsData?.all_cycles || [],
     
@@ -143,11 +190,12 @@ export const useTimeCards = () => {
     updatePreferences: updatePreferencesMutation.mutateAsync,
     refetch,
     
-    // Novas funções para cards avançados
+    // Funções para cards avançados
     getAllAvailableCards,
     isCardSelected,
     getVisibleCards,
     canAddMoreCycles,
     getSelectedCycles,
+    getSelectedCyclesCount,
   };
 }; 

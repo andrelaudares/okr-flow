@@ -12,6 +12,7 @@ export interface KeyResult {
   confidence_level?: number; // 0.0-1.0
   status: 'PLANNED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED';
   progress: number; // 0-100 (calculado automaticamente)
+  due_date?: string;
   created_at: string;
   updated_at: string;
   owner_name?: string;
@@ -27,6 +28,7 @@ export interface CreateKeyResultData {
   current_value?: number;
   confidence_level?: number;
   owner_id?: string;
+  due_date?: string;
 }
 
 export interface UpdateKeyResultData {
@@ -36,6 +38,8 @@ export interface UpdateKeyResultData {
   current_value?: number;
   confidence_level?: number;
   owner_id?: string;
+  due_date?: string;
+  status?: 'PLANNED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED';
 }
 
 export interface KeyResultFilters {

@@ -235,6 +235,13 @@ const KeyResultCard: React.FC<KeyResultCardProps> = ({
                 <span>Confiança: {Math.round(keyResult.confidence_level * 100)}%</span>
               </div>
             )}
+
+            {keyResult.due_date && (
+              <div className="flex items-center gap-2">
+                <Target className="h-4 w-4" />
+                <span>Prazo: {new Date(keyResult.due_date).toLocaleDateString('pt-BR')}</span>
+              </div>
+            )}
             
             <div className="text-xs text-gray-500 mt-3">
               Criado em {formatDate(keyResult.created_at)}

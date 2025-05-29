@@ -55,6 +55,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
     unit: 'PERCENTAGE' as 'PERCENTAGE' | 'NUMBER' | 'CURRENCY' | 'BINARY',
     confidence_level: 0.8,
     owner_id: '',
+    due_date: '',
   });
 
   const isEditing = !!keyResult;
@@ -73,6 +74,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
           unit: keyResult.unit,
           confidence_level: keyResult.confidence_level || 0.8,
           owner_id: keyResult.owner_id || '',
+          due_date: keyResult.due_date || '',
         });
       } else {
         // Creating mode
@@ -85,6 +87,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
           unit: 'PERCENTAGE',
           confidence_level: 0.8,
           owner_id: '',
+          due_date: '',
         });
       }
     }
@@ -123,6 +126,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
           current_value: formData.current_value,
           confidence_level: formData.confidence_level,
           owner_id: formData.owner_id === 'none' ? undefined : formData.owner_id || undefined,
+          due_date: formData.due_date,
         };
         await onSubmit(updateData);
       } else {
@@ -136,6 +140,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
           current_value: formData.current_value,
           confidence_level: formData.confidence_level,
           owner_id: formData.owner_id === 'none' ? undefined : formData.owner_id || undefined,
+          due_date: formData.due_date,
         };
         await onSubmit(createData);
       }
@@ -172,13 +177,13 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
   const getStep = () => {
     switch (formData.unit) {
       case 'PERCENTAGE':
-        return 1;
+        return 0.01;
       case 'BINARY':
         return 1;
       case 'CURRENCY':
         return 0.01;
       default:
-        return 1;
+        return 0.01;
     }
   };
 
@@ -342,6 +347,17 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Prazo */}
+          <div className="space-y-2">
+            <Label htmlFor="due_date">Prazo</Label>
+            <Input
+              id="due_date"
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => handleInputChange('due_date', e.target.value)}
+            />
           </div>
 
           {/* Botões */}

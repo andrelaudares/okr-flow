@@ -18,7 +18,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { useCycles } from '@/hooks/use-cycles';
 import { useUsers } from '@/hooks/use-users';
 import type { Objective, CreateObjectiveData, UpdateObjectiveData } from '@/types/objectives';
 
@@ -37,14 +36,12 @@ const ObjectiveForm: React.FC<ObjectiveFormProps> = ({
   onSubmit,
   isLoading = false,
 }) => {
-  const { cycles, activeCycle } = useCycles();
   const { users } = useUsers();
   
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     owner_id: '',
-    cycle_id: '',
     status: 'PLANNED' as 'PLANNED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED',
   });
 
@@ -59,7 +56,6 @@ const ObjectiveForm: React.FC<ObjectiveFormProps> = ({
           title: objective.title,
           description: objective.description || '',
           owner_id: objective.owner_id || '',
-          cycle_id: objective.cycle_id,
           status: objective.status,
         });
       } else {
@@ -68,12 +64,11 @@ const ObjectiveForm: React.FC<ObjectiveFormProps> = ({
           title: '',
           description: '',
           owner_id: '',
-          cycle_id: activeCycle?.id || '',
           status: 'PLANNED',
         });
       }
     }
-  }, [open, objective, activeCycle]);
+  }, [open, objective]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,12 +88,11 @@ const ObjectiveForm: React.FC<ObjectiveFormProps> = ({
         };
         await onSubmit(updateData);
       } else {
-        // Create objective
+        // Create objective - sem cycle_id
         const submitData = {
           title: formData.title.trim(),
           description: formData.description.trim() || undefined,
           owner_id: formData.owner_id === 'none' ? undefined : formData.owner_id || undefined,
-          cycle_id: formData.cycle_id || undefined,
         };
         await onSubmit(submitData);
       }
@@ -156,60 +150,26 @@ const ObjectiveForm: React.FC<ObjectiveFormProps> = ({
             />
           </div>
 
-          {/* Responsável - apenas na criação */}
-          {!isEditing && (
-            <div className="space-y-2">
-              <Label htmlFor="owner_id">Responsável</Label>
-              <Select
-                value={formData.owner_id}
-                onValueChange={(value) => handleInputChange('owner_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um responsável (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem responsável específico</SelectItem>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Ciclo - apenas na criação */}
-          {!isEditing && (
-            <div className="space-y-2">
-              <Label htmlFor="cycle_id">Ciclo</Label>
-              <Select
-                value={formData.cycle_id}
-                onValueChange={(value) => handleInputChange('cycle_id', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um ciclo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeCycle && (
-                    <SelectItem value={activeCycle.id}>
-                      {activeCycle.name} (Ativo)
-                    </SelectItem>
-                  )}
-                  {cycles
-                    .filter(cycle => cycle.id !== activeCycle?.id)
-                    .map((cycle) => (
-                      <SelectItem key={cycle.id} value={cycle.id}>
-                        {cycle.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500">
-                Se não selecionado, será usado o ciclo ativo
-              </p>
-            </div>
-          )}
+          {/* Responsável */}
+          <div className="space-y-2">
+            <Label htmlFor="owner_id">Responsável</Label>
+            <Select
+              value={formData.owner_id}
+              onValueChange={(value) => handleInputChange('owner_id', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um responsável (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem responsável específico</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Status - apenas na edição */}
           {isEditing && (

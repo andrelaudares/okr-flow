@@ -65,7 +65,10 @@ const DashboardInfoCards: React.FC<DashboardInfoCardsProps> = ({ objectives }) =
   // Salvar preferências
   const handleSavePreferences = async () => {
     try {
-      await updatePreferences({ selected_cards: tempSelectedCards });
+      // Filtrar apenas cards temporais válidos (não ciclos) para o backend
+      const validTimeCards = tempSelectedCards.filter(cardId => !cardId.startsWith('CYCLE_'));
+      
+      await updatePreferences({ selected_cards: validTimeCards });
       setShowSettings(false);
     } catch (error) {
       console.error('Erro ao salvar preferências:', error);
@@ -84,8 +87,8 @@ const DashboardInfoCards: React.FC<DashboardInfoCardsProps> = ({ objectives }) =
       // Adicionar card
       if (isCycleCard) {
         const currentCycleCards = tempSelectedCards.filter(id => id.startsWith('CYCLE_'));
-        if (currentCycleCards.length >= 3) {
-          toast.error('Você pode selecionar no máximo 3 ciclos');
+        if (currentCycleCards.length >= 2) {
+          toast.error('Você pode selecionar no máximo 2 ciclos');
           return;
         }
       }
@@ -200,14 +203,14 @@ const DashboardInfoCards: React.FC<DashboardInfoCardsProps> = ({ objectives }) =
                     <h4 className="font-medium text-sm text-gray-700">Ciclos</h4>
                     <div className="flex items-center gap-1 text-xs text-gray-500">
                       <AlertCircle className="h-3 w-3" />
-                      <span>{selectedCycleCards.length}/3 selecionados</span>
+                      <span>{selectedCycleCards.length}/2 selecionados</span>
                     </div>
                   </div>
                   {availableCards
                     .filter(card => card.category === 'cycle')
                     .map((card) => {
                       const isSelected = tempSelectedCards.includes(card.id);
-                      const canSelect = isSelected || tempSelectedCards.filter(id => id.startsWith('CYCLE_')).length < 3;
+                      const canSelect = isSelected || tempSelectedCards.filter(id => id.startsWith('CYCLE_')).length < 2;
                       
                       return (
                         <div key={card.id} className="flex items-center space-x-2 mb-2">
@@ -227,9 +230,9 @@ const DashboardInfoCards: React.FC<DashboardInfoCardsProps> = ({ objectives }) =
                         </div>
                       );
                     })}
-                  {tempSelectedCards.filter(id => id.startsWith('CYCLE_')).length >= 3 && (
+                  {tempSelectedCards.filter(id => id.startsWith('CYCLE_')).length >= 2 && (
                     <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
-                      Máximo de 3 ciclos selecionados. Desmarque um para selecionar outro.
+                      Máximo de 2 ciclos selecionados. Desmarque um para selecionar outro.
                     </div>
                   )}
                 </div>

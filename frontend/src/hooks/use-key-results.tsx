@@ -11,10 +11,10 @@ import type {
 } from '@/types/key-results';
 
 // Hook para gestão de Key Results
-export const useKeyResults = (objectiveId: string, filters?: KeyResultFilters) => {
+export const useKeyResults = (objectiveId: string, filters: KeyResultFilters = {}) => {
   const queryClient = useQueryClient();
 
-  // Query para listar Key Results de um objetivo
+  // Query para buscar Key Results
   const {
     data: keyResultsData,
     isLoading,
@@ -25,19 +25,17 @@ export const useKeyResults = (objectiveId: string, filters?: KeyResultFilters) =
     queryFn: async (): Promise<KeyResultsResponse> => {
       const params = new URLSearchParams();
       
-      if (filters?.search) params.append('search', filters.search);
-      if (filters?.status && filters.status.length > 0) {
-        filters.status.forEach(status => params.append('status', status));
-      }
-      if (filters?.owner_id) params.append('owner_id', filters.owner_id);
-      if (filters?.unit) params.append('unit', filters.unit);
-      if (filters?.limit) params.append('limit', filters.limit.toString());
-      if (filters?.offset) params.append('offset', filters.offset.toString());
+      if (filters.search) params.append('search', filters.search);
+      if (filters.status?.length) params.append('status', filters.status.join(','));
+      if (filters.owner_id) params.append('owner_id', filters.owner_id);
+      if (filters.unit) params.append('unit', filters.unit);
+      if (filters.limit) params.append('limit', filters.limit.toString());
+      if (filters.offset) params.append('offset', filters.offset.toString());
 
-      const response = await api.get(`/api/objectives/${objectiveId}/key-results?${params.toString()}`);
+      const response = await api.get(`/api/objectives/${objectiveId}/key-results?${params}`);
       return response.data;
     },
-    enabled: !!objectiveId,
+    enabled: !!objectiveId && !!localStorage.getItem('nobugOkrToken'),
     staleTime: 2 * 60 * 1000, // 2 minutos
   });
 
@@ -54,56 +52,52 @@ export const useKeyResults = (objectiveId: string, filters?: KeyResultFilters) =
   };
 
   // Mutation para criar Key Result
-  const createKeyResultMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async (data: CreateKeyResultData): Promise<KeyResult> => {
       const response = await api.post(`/api/objectives/${objectiveId}/key-results`, data);
       return response.data;
     },
-    onSuccess: (newKeyResult) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['key-results', objectiveId] });
       queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success(`Key Result "${newKeyResult.title}" criado com sucesso!`);
+      toast.success('Key Result criado com sucesso!');
     },
     onError: (error: any) => {
       console.error('Erro ao criar Key Result:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao criar Key Result');
+      toast.error(error.message || 'Erro ao criar Key Result');
     },
   });
 
   // Mutation para atualizar Key Result
-  const updateKeyResultMutation = useMutation({
+  const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateKeyResultData }): Promise<KeyResult> => {
       const response = await api.put(`/api/objectives/key-results/${id}`, data);
       return response.data;
     },
-    onSuccess: (updatedKeyResult) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['key-results', objectiveId] });
-      queryClient.invalidateQueries({ queryKey: ['key-result', updatedKeyResult.id] });
       queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success(`Key Result "${updatedKeyResult.title}" atualizado com sucesso!`);
+      toast.success('Key Result atualizado com sucesso!');
     },
     onError: (error: any) => {
       console.error('Erro ao atualizar Key Result:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar Key Result');
+      toast.error(error.message || 'Erro ao atualizar Key Result');
     },
   });
 
   // Mutation para deletar Key Result
-  const deleteKeyResultMutation = useMutation({
-    mutationFn: async (keyResultId: string): Promise<void> => {
-      await api.delete(`/api/objectives/key-results/${keyResultId}`);
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await api.delete(`/api/objectives/key-results/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['key-results', objectiveId] });
       queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Key Result deletado com sucesso!');
+      toast.success('Key Result excluído com sucesso!');
     },
     onError: (error: any) => {
-      console.error('Erro ao deletar Key Result:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao deletar Key Result');
+      console.error('Erro ao excluir Key Result:', error);
+      toast.error(error.message || 'Erro ao excluir Key Result');
     },
   });
 
@@ -120,15 +114,15 @@ export const useKeyResults = (objectiveId: string, filters?: KeyResultFilters) =
     error,
     
     // Estados das mutations
-    isCreating: createKeyResultMutation.isPending,
-    isUpdating: updateKeyResultMutation.isPending,
-    isDeleting: deleteKeyResultMutation.isPending,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     
     // Funções
-    createKeyResult: createKeyResultMutation.mutateAsync,
+    createKeyResult: createMutation.mutateAsync,
     updateKeyResult: (id: string, data: UpdateKeyResultData) => 
-      updateKeyResultMutation.mutateAsync({ id, data }),
-    deleteKeyResult: deleteKeyResultMutation.mutateAsync,
+      updateMutation.mutateAsync({ id, data }),
+    deleteKeyResult: deleteMutation.mutateAsync,
     getKeyResultById,
     refetch,
   };

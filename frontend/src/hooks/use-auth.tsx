@@ -46,13 +46,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (storedUser && storedToken) {
           const userData = JSON.parse(storedUser);
           
-          setState({
+            setState({
             user: userData,
-            token: storedToken,
-            isLoading: false,
-            isAuthenticated: true,
-          });
-          
+              token: storedToken,
+              isLoading: false,
+              isAuthenticated: true,
+            });
+            
           console.log("Usuário autenticado:", userData.email);
         } else {
           console.log("Nenhum token armazenado encontrado");

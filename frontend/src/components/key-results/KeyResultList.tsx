@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import KeyResultCard from './KeyResultCard';
 import KeyResultForm from './KeyResultForm';
+import CheckinForm from '../checkins/CheckinForm';
 import { useKeyResults } from '@/hooks/use-key-results';
+import { useCheckins } from '@/hooks/use-checkins';
 import { usePermissions } from '@/hooks/use-auth';
 import { 
   Plus, 
@@ -14,7 +16,14 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
-import type { KeyResult, CreateKeyResultData, UpdateKeyResultData } from '@/types/key-results';
+import type { 
+  KeyResult, 
+  CreateKeyResultData, 
+  UpdateKeyResultData,
+  CreateCheckinData,
+  UpdateCheckinData,
+  Checkin
+} from '@/types/key-results';
 
 interface KeyResultListProps {
   objectiveId: string;
@@ -43,6 +52,19 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
 
   const [showKeyResultForm, setShowKeyResultForm] = useState(false);
   const [editingKeyResult, setEditingKeyResult] = useState<KeyResult | null>(null);
+  
+  // Estados para check-ins
+  const [showCheckinForm, setShowCheckinForm] = useState(false);
+  const [selectedKeyResult, setSelectedKeyResult] = useState<KeyResult | null>(null);
+  const [editingCheckin, setEditingCheckin] = useState<Checkin | null>(null);
+
+  // Hook de check-ins (só ativa quando necessário)
+  const { 
+    createCheckin,
+    updateCheckin,
+    isCreating: isCreatingCheckin,
+    isUpdating: isUpdatingCheckin
+  } = useCheckins(selectedKeyResult?.id || '');
 
   const handleCreateKeyResult = async (data: CreateKeyResultData) => {
     await createKeyResult(data);
@@ -70,9 +92,42 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
     setEditingKeyResult(null);
   };
 
+  // Funções para check-ins
   const handleAddCheckin = (keyResultId: string) => {
-    // TODO: Implementar modal de check-in
-    console.log('Adicionar check-in para Key Result:', keyResultId);
+    const keyResult = keyResults.find(kr => kr.id === keyResultId);
+    if (keyResult) {
+      setSelectedKeyResult(keyResult);
+      setEditingCheckin(null);
+      setShowCheckinForm(true);
+    }
+  };
+
+  const handleCreateCheckin = async (data: CreateCheckinData) => {
+    if (selectedKeyResult) {
+      await createCheckin(data);
+      setShowCheckinForm(false);
+      setSelectedKeyResult(null);
+    }
+  };
+
+  const handleUpdateCheckinAndKeyResult = async (checkinData: UpdateCheckinData, keyResultData?: UpdateKeyResultData) => {
+    if (editingCheckin && selectedKeyResult) {
+      await updateCheckin(editingCheckin.id, checkinData);
+      
+      if (keyResultData) {
+        await updateKeyResult(selectedKeyResult.id, keyResultData);
+      }
+      
+      setShowCheckinForm(false);
+      setEditingCheckin(null);
+      setSelectedKeyResult(null);
+    }
+  };
+
+  const handleCloseCheckinForm = () => {
+    setShowCheckinForm(false);
+    setSelectedKeyResult(null);
+    setEditingCheckin(null);
   };
 
   // Calcular estatísticas dos Key Results
@@ -213,6 +268,24 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
         onSubmit={editingKeyResult ? handleUpdateKeyResult : handleCreateKeyResult}
         isLoading={isCreating || isUpdating}
       />
+
+      {/* Formulário de Check-in */}
+      {selectedKeyResult && (
+        <CheckinForm
+          open={showCheckinForm}
+          onOpenChange={handleCloseCheckinForm}
+          keyResult={selectedKeyResult}
+          checkin={editingCheckin}
+          onSubmitCheckin={editingCheckin ? 
+            (data) => handleUpdateCheckinAndKeyResult(data as UpdateCheckinData) : 
+            handleCreateCheckin
+          }
+          onUpdateKeyResult={async (data) => {
+            await updateKeyResult(selectedKeyResult.id, data);
+          }}
+          isLoading={isCreatingCheckin || isUpdatingCheckin}
+        />
+      )}
     </div>
   );
 };

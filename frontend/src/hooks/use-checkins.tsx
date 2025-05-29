@@ -12,7 +12,7 @@ import type {
 export const useCheckins = (keyResultId: string) => {
   const queryClient = useQueryClient();
 
-  // Query para listar Check-ins de um Key Result
+  // Query para buscar Check-ins
   const {
     data: checkinsData,
     isLoading,
@@ -24,63 +24,60 @@ export const useCheckins = (keyResultId: string) => {
       const response = await api.get(`/api/objectives/key-results/${keyResultId}/checkins`);
       return response.data;
     },
-    enabled: !!keyResultId,
+    enabled: !!keyResultId && !!localStorage.getItem('nobugOkrToken'),
     staleTime: 1 * 60 * 1000, // 1 minuto
   });
 
   // Mutation para criar Check-in
-  const createCheckinMutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async (data: CreateCheckinData): Promise<Checkin> => {
       const response = await api.post(`/api/objectives/key-results/${keyResultId}/checkins`, data);
       return response.data;
-    },
-    onSuccess: (newCheckin) => {
-      queryClient.invalidateQueries({ queryKey: ['checkins', keyResultId] });
-      queryClient.invalidateQueries({ queryKey: ['key-results'] });
-      queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Check-in registrado com sucesso!');
-    },
-    onError: (error: any) => {
-      console.error('Erro ao criar check-in:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao registrar check-in');
-    },
-  });
-
-  // Mutation para atualizar Check-in
-  const updateCheckinMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateCheckinData }): Promise<Checkin> => {
-      const response = await api.put(`/api/objectives/checkins/${id}`, data);
-      return response.data;
-    },
-    onSuccess: (updatedCheckin) => {
-      queryClient.invalidateQueries({ queryKey: ['checkins', keyResultId] });
-      queryClient.invalidateQueries({ queryKey: ['key-results'] });
-      queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Check-in atualizado com sucesso!');
-    },
-    onError: (error: any) => {
-      console.error('Erro ao atualizar check-in:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar check-in');
-    },
-  });
-
-  // Mutation para deletar Check-in
-  const deleteCheckinMutation = useMutation({
-    mutationFn: async (checkinId: string): Promise<void> => {
-      await api.delete(`/api/objectives/checkins/${checkinId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checkins', keyResultId] });
       queryClient.invalidateQueries({ queryKey: ['key-results'] });
       queryClient.invalidateQueries({ queryKey: ['objectives'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast.success('Check-in deletado com sucesso!');
+      toast.success('Check-in registrado com sucesso!');
     },
     onError: (error: any) => {
-      console.error('Erro ao deletar check-in:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao deletar check-in');
+      console.error('Erro ao criar check-in:', error);
+      toast.error(error.message || 'Erro ao registrar check-in');
+    },
+  });
+
+  // Mutation para atualizar Check-in
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateCheckinData }): Promise<Checkin> => {
+      const response = await api.put(`/api/objectives/checkins/${id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checkins', keyResultId] });
+      queryClient.invalidateQueries({ queryKey: ['key-results'] });
+      queryClient.invalidateQueries({ queryKey: ['objectives'] });
+      toast.success('Check-in atualizado com sucesso!');
+    },
+    onError: (error: any) => {
+      console.error('Erro ao atualizar check-in:', error);
+      toast.error(error.message || 'Erro ao atualizar check-in');
+    },
+  });
+
+  // Mutation para deletar Check-in
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string): Promise<void> => {
+      await api.delete(`/api/objectives/checkins/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checkins', keyResultId] });
+      queryClient.invalidateQueries({ queryKey: ['key-results'] });
+      queryClient.invalidateQueries({ queryKey: ['objectives'] });
+      toast.success('Check-in excluído com sucesso!');
+    },
+    onError: (error: any) => {
+      console.error('Erro ao excluir check-in:', error);
+      toast.error(error.message || 'Erro ao excluir check-in');
     },
   });
 
@@ -93,17 +90,15 @@ export const useCheckins = (keyResultId: string) => {
     isLoading,
     isError: !!error,
     error,
-    
-    // Estados das mutations
-    isCreating: createCheckinMutation.isPending,
-    isUpdating: updateCheckinMutation.isPending,
-    isDeleting: deleteCheckinMutation.isPending,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
     
     // Funções
-    createCheckin: createCheckinMutation.mutateAsync,
+    createCheckin: createMutation.mutateAsync,
     updateCheckin: (id: string, data: UpdateCheckinData) => 
-      updateCheckinMutation.mutateAsync({ id, data }),
-    deleteCheckin: deleteCheckinMutation.mutateAsync,
+      updateMutation.mutateAsync({ id, data }),
+    deleteCheckin: deleteMutation.mutateAsync,
     refetch,
   };
 }; 
