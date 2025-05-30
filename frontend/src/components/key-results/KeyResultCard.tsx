@@ -33,15 +33,17 @@ import {
   DollarSign,
   CheckCircle
 } from 'lucide-react';
-import type { KeyResult } from '@/types/key-results';
+import type { Meta } from '@/types/key-results';
 import { usePermissions } from '@/hooks/use-auth';
 
-interface KeyResultCardProps {
-  keyResult: KeyResult;
-  onEdit?: (keyResult: KeyResult) => void;
-  onDelete?: (keyResultId: string) => void;
-  onAddCheckin?: (keyResultId: string) => void;
+interface MetaCardProps {
+  keyResult: Meta;
+  onEdit?: (meta: Meta) => void;
+  onDelete?: (metaId: string) => void;
+  onAddCheckin?: (metaId: string) => void;
 }
+
+export type KeyResultCardProps = MetaCardProps;
 
 const getStatusConfig = (status: string) => {
   switch (status) {
@@ -91,7 +93,7 @@ const formatValue = (value: number, unit: string) => {
   }
 };
 
-const KeyResultCard: React.FC<KeyResultCardProps> = ({
+const MetaCard: React.FC<MetaCardProps> = ({
   keyResult,
   onEdit,
   onDelete,
@@ -274,7 +276,7 @@ const KeyResultCard: React.FC<KeyResultCardProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o Key Result "{keyResult.title}"?
+              Tem certeza que deseja excluir a Meta "{keyResult.title}"?
               Esta ação não pode ser desfeita e todos os check-ins associados também serão removidos.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -293,4 +295,7 @@ const KeyResultCard: React.FC<KeyResultCardProps> = ({
   );
 };
 
-export default KeyResultCard; 
+// Manter compatibilidade com nome antigo
+export const KeyResultCard = MetaCard;
+
+export default MetaCard; 

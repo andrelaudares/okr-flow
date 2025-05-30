@@ -20,15 +20,17 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { useUsers } from '@/hooks/use-users';
-import type { KeyResult, CreateKeyResultData, UpdateKeyResultData } from '@/types/key-results';
+import type { Meta, CreateMetaData, UpdateMetaData } from '@/types/key-results';
 
-interface KeyResultFormProps {
+interface MetaFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  keyResult?: KeyResult | null;
-  onSubmit: (data: CreateKeyResultData | UpdateKeyResultData) => Promise<void>;
+  keyResult?: Meta | null;
+  onSubmit: (data: CreateMetaData | UpdateMetaData) => Promise<void>;
   isLoading?: boolean;
 }
+
+export type KeyResultFormProps = MetaFormProps;
 
 const unitOptions = [
   { value: 'PERCENTAGE', label: 'Porcentagem (%)', example: 'Ex: 85%' },
@@ -37,7 +39,7 @@ const unitOptions = [
   { value: 'BINARY', label: 'Sim/Não', example: 'Ex: Concluído ou não' },
 ];
 
-const KeyResultForm: React.FC<KeyResultFormProps> = ({
+const MetaForm: React.FC<MetaFormProps> = ({
   open,
   onOpenChange,
   keyResult,
@@ -118,8 +120,8 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
 
     try {
       if (isEditing) {
-        // Update Key Result
-        const updateData: UpdateKeyResultData = {
+        // Update Meta
+        const updateData: UpdateMetaData = {
           title: formData.title.trim(),
           description: formData.description.trim() || undefined,
           target_value: formData.target_value,
@@ -130,8 +132,8 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
         };
         await onSubmit(updateData);
       } else {
-        // Create Key Result
-        const createData: CreateKeyResultData = {
+        // Create Meta
+        const createData: CreateMetaData = {
           title: formData.title.trim(),
           description: formData.description.trim() || undefined,
           target_value: formData.target_value,
@@ -147,7 +149,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
       
       onOpenChange(false);
     } catch (error) {
-      console.error('Erro ao salvar Key Result:', error);
+      console.error('Erro ao salvar Meta:', error);
     }
   };
 
@@ -192,12 +194,12 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? 'Editar Key Result' : 'Novo Key Result'}
+            {isEditing ? 'Editar Meta' : 'Nova Meta'}
           </DialogTitle>
           <DialogDescription>
             {isEditing 
-              ? 'Atualize as informações do Key Result.'
-              : 'Crie um novo Key Result para medir o progresso do objetivo.'
+              ? 'Atualize as informações da Meta.'
+              : 'Crie uma nova Meta para medir o progresso do objetivo.'
             }
           </DialogDescription>
         </DialogHeader>
@@ -365,7 +367,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
             <Button type="submit" disabled={isLoading} className="flex-1">
               {isLoading 
                 ? (isEditing ? 'Salvando...' : 'Criando...') 
-                : (isEditing ? 'Salvar Alterações' : 'Criar Key Result')
+                : (isEditing ? 'Salvar Alterações' : 'Criar Meta')
               }
             </Button>
             <Button 
@@ -383,4 +385,7 @@ const KeyResultForm: React.FC<KeyResultFormProps> = ({
   );
 };
 
-export default KeyResultForm; 
+// Manter compatibilidade com nome antigo
+export const KeyResultForm = MetaForm;
+
+export default MetaForm; 

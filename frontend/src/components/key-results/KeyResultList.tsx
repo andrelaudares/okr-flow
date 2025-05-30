@@ -17,45 +17,45 @@ import {
 } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 import type { 
-  KeyResult, 
-  CreateKeyResultData, 
-  UpdateKeyResultData,
+  Meta, 
+  CreateMetaData, 
+  UpdateMetaData,
   CreateCheckinData,
   UpdateCheckinData,
   Checkin
 } from '@/types/key-results';
 
-interface KeyResultListProps {
+interface MetaListProps {
   objectiveId: string;
   objectiveTitle: string;
 }
 
-const KeyResultList: React.FC<KeyResultListProps> = ({
+const MetaList: React.FC<MetaListProps> = ({
   objectiveId,
   objectiveTitle,
 }) => {
   const { isOwner, isAdmin } = usePermissions();
-  const canCreateKeyResult = isOwner || isAdmin;
+  const canCreateMeta = isOwner || isAdmin;
   
   const { 
-    keyResults, 
+    keyResults: metas, 
     total, 
     isLoading, 
     isCreating,
     isUpdating,
     isDeleting,
-    createKeyResult,
-    updateKeyResult,
-    deleteKeyResult,
+    createKeyResult: createMeta,
+    updateKeyResult: updateMeta,
+    deleteKeyResult: deleteMeta,
     refetch 
   } = useKeyResults(objectiveId);
 
-  const [showKeyResultForm, setShowKeyResultForm] = useState(false);
-  const [editingKeyResult, setEditingKeyResult] = useState<KeyResult | null>(null);
+  const [showMetaForm, setShowMetaForm] = useState(false);
+  const [editingMeta, setEditingMeta] = useState<Meta | null>(null);
   
   // Estados para check-ins
   const [showCheckinForm, setShowCheckinForm] = useState(false);
-  const [selectedKeyResult, setSelectedKeyResult] = useState<KeyResult | null>(null);
+  const [selectedMeta, setSelectedMeta] = useState<Meta | null>(null);
   const [editingCheckin, setEditingCheckin] = useState<Checkin | null>(null);
 
   // Hook de check-ins (só ativa quando necessário)
@@ -64,81 +64,81 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
     updateCheckin,
     isCreating: isCreatingCheckin,
     isUpdating: isUpdatingCheckin
-  } = useCheckins(selectedKeyResult?.id || '');
+  } = useCheckins(selectedMeta?.id || '');
 
-  const handleCreateKeyResult = async (data: CreateKeyResultData) => {
-    await createKeyResult(data);
-    setShowKeyResultForm(false);
+  const handleCreateMeta = async (data: CreateMetaData) => {
+    await createMeta(data);
+    setShowMetaForm(false);
   };
 
-  const handleUpdateKeyResult = async (data: UpdateKeyResultData) => {
-    if (editingKeyResult) {
-      await updateKeyResult(editingKeyResult.id, data);
-      setEditingKeyResult(null);
+  const handleUpdateMeta = async (data: UpdateMetaData) => {
+    if (editingMeta) {
+      await updateMeta(editingMeta.id, data);
+      setEditingMeta(null);
     }
   };
 
-  const handleEditKeyResult = (keyResult: KeyResult) => {
-    setEditingKeyResult(keyResult);
-    setShowKeyResultForm(true);
+  const handleEditMeta = (meta: Meta) => {
+    setEditingMeta(meta);
+    setShowMetaForm(true);
   };
 
-  const handleDeleteKeyResult = async (keyResultId: string) => {
-    await deleteKeyResult(keyResultId);
+  const handleDeleteMeta = async (metaId: string) => {
+    await deleteMeta(metaId);
   };
 
   const handleCloseForm = () => {
-    setShowKeyResultForm(false);
-    setEditingKeyResult(null);
+    setShowMetaForm(false);
+    setEditingMeta(null);
   };
 
   // Funções para check-ins
-  const handleAddCheckin = (keyResultId: string) => {
-    const keyResult = keyResults.find(kr => kr.id === keyResultId);
-    if (keyResult) {
-      setSelectedKeyResult(keyResult);
+  const handleAddCheckin = (metaId: string) => {
+    const meta = metas.find(m => m.id === metaId);
+    if (meta) {
+      setSelectedMeta(meta);
       setEditingCheckin(null);
       setShowCheckinForm(true);
     }
   };
 
   const handleCreateCheckin = async (data: CreateCheckinData) => {
-    if (selectedKeyResult) {
+    if (selectedMeta) {
       await createCheckin(data);
       setShowCheckinForm(false);
-      setSelectedKeyResult(null);
+      setSelectedMeta(null);
     }
   };
 
-  const handleUpdateCheckinAndKeyResult = async (checkinData: UpdateCheckinData, keyResultData?: UpdateKeyResultData) => {
-    if (editingCheckin && selectedKeyResult) {
+  const handleUpdateCheckinAndMeta = async (checkinData: UpdateCheckinData, metaData?: UpdateMetaData) => {
+    if (editingCheckin && selectedMeta) {
       await updateCheckin(editingCheckin.id, checkinData);
       
-      if (keyResultData) {
-        await updateKeyResult(selectedKeyResult.id, keyResultData);
+      if (metaData) {
+        await updateMeta(selectedMeta.id, metaData);
       }
       
       setShowCheckinForm(false);
       setEditingCheckin(null);
-      setSelectedKeyResult(null);
+      setSelectedMeta(null);
     }
   };
 
   const handleCloseCheckinForm = () => {
     setShowCheckinForm(false);
-    setSelectedKeyResult(null);
+    setSelectedMeta(null);
     setEditingCheckin(null);
   };
 
-  // Calcular estatísticas dos Key Results
+  // Calcular estatísticas das Metas
   const stats = {
-    total: keyResults.length,
-    completed: keyResults.filter(kr => kr.status === 'COMPLETED').length,
-    onTrack: keyResults.filter(kr => kr.status === 'ON_TRACK').length,
-    atRisk: keyResults.filter(kr => kr.status === 'AT_RISK').length,
-    behind: keyResults.filter(kr => kr.status === 'BEHIND').length,
-    averageProgress: keyResults.length > 0 
-      ? Math.round(keyResults.reduce((acc, kr) => acc + kr.progress, 0) / keyResults.length)
+    total: metas.length,
+    completed: metas.filter(m => m.status === 'COMPLETED').length,
+    onTrack: metas.filter(m => m.status === 'ON_TRACK').length,
+    atRisk: metas.filter(m => m.status === 'AT_RISK').length,
+    behind: metas.filter(m => m.status === 'BEHIND').length,
+    averageProgress: metas.length > 0 
+      ? Math.round(metas.reduce((acc, m) => acc + m.progress, 0) / metas.length)
       : 0,
   };
 
@@ -149,23 +149,23 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
         <div>
           <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <Activity className="h-5 w-5 text-blue-600" />
-            Key Results
+            Metas
           </h2>
           <p className="text-sm text-gray-600">
             Objetivo: {objectiveTitle}
           </p>
         </div>
         
-        {canCreateKeyResult && (
-          <Button onClick={() => setShowKeyResultForm(true)}>
+        {canCreateMeta && (
+          <Button onClick={() => setShowMetaForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
-            Novo Key Result
+            Nova Meta
           </Button>
         )}
       </div>
 
       {/* Estatísticas */}
-      {keyResults.length > 0 && (
+      {metas.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -175,7 +175,7 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
             <CardContent>
               <div className="text-2xl font-bold">{stats.total}</div>
               <p className="text-xs text-muted-foreground">
-                {stats.completed} concluídos
+                {stats.completed} concluídas
               </p>
             </CardContent>
           </Card>
@@ -214,33 +214,33 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{stats.behind}</div>
               <p className="text-xs text-muted-foreground">
-                Atrasados
+                Atrasadas
               </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Lista de Key Results */}
+      {/* Lista de Metas */}
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16">
-          <Loading text="Carregando Key Results..." />
+          <Loading text="Carregando Metas..." />
         </div>
-      ) : keyResults.length === 0 ? (
+      ) : metas.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Nenhum Key Result encontrado
+                Nenhuma Meta encontrada
               </h3>
               <p className="text-gray-600 mb-4">
-                Comece criando Key Results para medir o progresso deste objetivo.
+                Comece criando Metas para medir o progresso deste objetivo.
               </p>
-              {canCreateKeyResult && (
-                <Button onClick={() => setShowKeyResultForm(true)}>
+              {canCreateMeta && (
+                <Button onClick={() => setShowMetaForm(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Criar Primeiro Key Result
+                  Criar Primeira Meta
                 </Button>
               )}
             </div>
@@ -248,40 +248,40 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {keyResults.map((keyResult) => (
+          {metas.map((meta) => (
             <KeyResultCard
-              key={keyResult.id}
-              keyResult={keyResult}
-              onEdit={handleEditKeyResult}
-              onDelete={handleDeleteKeyResult}
+              key={meta.id}
+              keyResult={meta}
+              onEdit={handleEditMeta}
+              onDelete={handleDeleteMeta}
               onAddCheckin={handleAddCheckin}
             />
           ))}
         </div>
       )}
 
-      {/* Formulário de Key Result */}
+      {/* Formulário de Meta */}
       <KeyResultForm
-        open={showKeyResultForm}
+        open={showMetaForm}
         onOpenChange={handleCloseForm}
-        keyResult={editingKeyResult}
-        onSubmit={editingKeyResult ? handleUpdateKeyResult : handleCreateKeyResult}
+        keyResult={editingMeta}
+        onSubmit={editingMeta ? handleUpdateMeta : handleCreateMeta}
         isLoading={isCreating || isUpdating}
       />
 
       {/* Formulário de Check-in */}
-      {selectedKeyResult && (
+      {selectedMeta && (
         <CheckinForm
           open={showCheckinForm}
           onOpenChange={handleCloseCheckinForm}
-          keyResult={selectedKeyResult}
+          keyResult={selectedMeta}
           checkin={editingCheckin}
           onSubmitCheckin={editingCheckin ? 
-            (data) => handleUpdateCheckinAndKeyResult(data as UpdateCheckinData) : 
+            (data) => handleUpdateCheckinAndMeta(data as UpdateCheckinData) : 
             handleCreateCheckin
           }
           onUpdateKeyResult={async (data) => {
-            await updateKeyResult(selectedKeyResult.id, data);
+            await updateMeta(selectedMeta.id, data);
           }}
           isLoading={isCreatingCheckin || isUpdatingCheckin}
         />
@@ -290,4 +290,7 @@ const KeyResultList: React.FC<KeyResultListProps> = ({
   );
 };
 
-export default KeyResultList; 
+// Manter compatibilidade com nome antigo
+export const KeyResultList = MetaList;
+
+export default MetaList; 

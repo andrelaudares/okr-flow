@@ -1,5 +1,5 @@
-// Interfaces para Key Results
-export interface KeyResult {
+// Interfaces para Metas
+export interface Meta {
   id: string;
   title: string;
   description?: string;
@@ -19,7 +19,10 @@ export interface KeyResult {
   objective_title: string;
 }
 
-export interface CreateKeyResultData {
+// Manter compatibilidade com código existente
+export type KeyResult = Meta;
+
+export interface CreateMetaData {
   title: string;
   description?: string;
   target_value: number;
@@ -31,7 +34,10 @@ export interface CreateKeyResultData {
   due_date?: string;
 }
 
-export interface UpdateKeyResultData {
+// Manter compatibilidade com código existente
+export type CreateKeyResultData = CreateMetaData;
+
+export interface UpdateMetaData {
   title?: string;
   description?: string;
   target_value?: number;
@@ -42,7 +48,10 @@ export interface UpdateKeyResultData {
   status?: 'PLANNED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED';
 }
 
-export interface KeyResultFilters {
+// Manter compatibilidade com código existente
+export type UpdateKeyResultData = UpdateMetaData;
+
+export interface MetaFilters {
   search?: string;
   status?: string[];
   owner_id?: string;
@@ -51,12 +60,18 @@ export interface KeyResultFilters {
   offset?: number;
 }
 
-export interface KeyResultsResponse {
-  key_results: KeyResult[];
+// Manter compatibilidade com código existente
+export type KeyResultFilters = MetaFilters;
+
+export interface MetasResponse {
+  metas: Meta[];
   total: number;
   has_more: boolean;
-  filters_applied: KeyResultFilters;
+  filters_applied: MetaFilters;
 }
+
+// Manter compatibilidade com código existente
+export type KeyResultsResponse = MetasResponse;
 
 // Interfaces para Check-ins
 export interface Checkin {

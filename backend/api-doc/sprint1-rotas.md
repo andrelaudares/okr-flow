@@ -45,9 +45,9 @@ curl -X POST "http://localhost:8000/api/auth/register" \
 - `201 Created`: Usuário registrado com sucesso.
 ```json
 {
-  "message": "Usuário registrado com sucesso. Aguarde aprovação para liberação de acesso.",
+  "message": "Cadastro realizado com sucesso! Você já pode fazer login no sistema.",
   "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-  "requires_approval": true
+  "requires_approval": false
 }
 ```
 - `400 Bad Request`: Dados inválidos na requisição.
@@ -57,6 +57,7 @@ curl -X POST "http://localhost:8000/api/auth/register" \
 
 ### `POST /api/auth/login`
 Autentica um usuário existente e retorna um token JWT para acesso a rotas protegidas.
+**Nota:** Usuários podem fazer login independentemente do status ativo/inativo.
 
 - **Endpoint:** `/api/auth/login`
 - **Método:** `POST`
@@ -91,7 +92,7 @@ curl -X POST "http://localhost:8000/api/auth/login" \
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
-- `401 Unauthorized`: Credenciais inválidas ou usuário desativado.
+- `401 Unauthorized`: Credenciais inválidas ou usuário não encontrado no sistema.
 - `500 Internal Server Error`: Erro interno no servidor.
 
 ---
@@ -347,6 +348,7 @@ curl -X GET "http://localhost:8000/api/users" \
 
 ### `POST /api/users`
 Cria um novo usuário na empresa. Apenas owners e admins podem criar usuários. Requer autenticação.
+**Nota:** CPF/CNPJ não é obrigatório para usuários criados por owners/admins. O novo usuário herda a company_id do criador e já inicia ativo.
 
 - **Endpoint:** `/api/users`
 - **Método:** `POST`

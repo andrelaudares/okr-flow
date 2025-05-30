@@ -46,7 +46,7 @@ class Objective(ObjectiveBase):
     id: UUID
     owner_id: Optional[UUID]
     company_id: UUID
-    cycle_id: UUID
+    cycle_id: Optional[UUID]
     status: ObjectiveStatus
     progress: float = Field(default=0.0, ge=0.0, le=100.0, description="Progresso do objetivo (0-100%)")
     created_at: datetime
@@ -58,7 +58,7 @@ class Objective(ObjectiveBase):
 class ObjectiveWithDetails(Objective):
     """Modelo do objetivo com detalhes adicionais"""
     owner_name: Optional[str] = Field(None, description="Nome do responsável")
-    cycle_name: str = Field(..., description="Nome do ciclo")
+    cycle_name: Optional[str] = Field(None, description="Nome do ciclo")
     key_results_count: int = Field(default=0, description="Número de key results")
     
     class Config:

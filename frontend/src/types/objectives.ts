@@ -5,13 +5,13 @@ export interface Objective {
   description?: string;
   owner_id?: string;
   company_id: string;
-  cycle_id: string;
+  cycle_id?: string;
   status: 'PLANNED' | 'ON_TRACK' | 'AT_RISK' | 'BEHIND' | 'COMPLETED';
   progress: number; // 0-100
   created_at: string;
   updated_at: string;
   owner_name?: string;
-  cycle_name: string;
+  cycle_name?: string;
   key_results_count: number;
 }
 

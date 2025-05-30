@@ -139,7 +139,7 @@ async def register_user(user_data: UserRegister):
             'role': 'ADMIN',
             'company_id': company_id,
             'is_owner': True,
-            'is_active': False  # Novo usuário precisa ser aprovado
+            'is_active': True  # Novo usuário já inicia ativo
         }
 
         try:
@@ -175,9 +175,9 @@ async def register_user(user_data: UserRegister):
         
         
         return UserRegisterResponse(
-            message="Cadastro realizado com sucesso! Seu acesso será liberado em até 48 horas após análise do nosso time. Você receberá um email quando estiver aprovado.",
+            message="Cadastro realizado com sucesso! Você já pode fazer login no sistema.",
             user_id=user_id,
-            requires_approval=True
+            requires_approval=False
         )
 
     except HTTPException:
@@ -211,7 +211,7 @@ async def login_user(user_data: UserLogin):
         if not auth_response.session:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
 
-        # Verificar se usuário existe na tabela users e está ativo
+        # Verificar se usuário existe na tabela users
         try:
             user_check = supabase_admin.from_('users').select("*").eq('email', user_data.email).execute()
             
@@ -222,10 +222,11 @@ async def login_user(user_data: UserLogin):
             
             user_profile = user_check.data[0]
             
-            if not user_profile.get('is_active', True):
-                # Fazer logout do usuário se estiver inativo
-                supabase_client.auth.sign_out()
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário desativado. Entre em contato com o administrador.")
+            # Removemos a verificação de is_active para permitir login de usuários inativos
+            # if not user_profile.get('is_active', True):
+            #     # Fazer logout do usuário se estiver inativo
+            #     supabase_client.auth.sign_out()
+            #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário desativado. Entre em contato com o administrador.")
                 
         except HTTPException:
             raise

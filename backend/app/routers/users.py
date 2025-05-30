@@ -82,7 +82,7 @@ async def create_user(user_data: UserCreate, current_user: UserProfile = Depends
             'email': user_data.email,
             'username': user_data.username,
             'name': user_data.name,
-            'cpf_cnpj': '',  # CPF/CNPJ não obrigatório para usuários secundários
+            'cpf_cnpj': None,  # CPF/CNPJ não obrigatório para usuários secundários
             'role': user_data.role.value,
             'company_id': str(current_user.company_id),
             'team_id': str(user_data.team_id) if user_data.team_id else None,

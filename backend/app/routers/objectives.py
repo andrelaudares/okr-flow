@@ -121,7 +121,7 @@ async def list_objectives(
                 'created_at': obj_data['created_at'],
                 'updated_at': obj_data['updated_at'],
                 'owner_name': obj_data['owner']['name'] if obj_data.get('owner') else None,
-                'cycle_name': obj_data['cycle']['name'] if obj_data.get('cycle') else 'Ciclo não encontrado',
+                'cycle_name': obj_data['cycle']['name'] if obj_data.get('cycle') and obj_data['cycle'] else None,
                 'key_results_count': await get_key_results_count(obj_data['id'])
             }
             objectives.append(ObjectiveWithDetails(**formatted_data))
@@ -151,7 +151,7 @@ async def create_objective(
 ):
     """
     Cria um novo objetivo para a empresa.
-    Se cycle_id não for informado, usa o ciclo ativo automaticamente.
+    Se cycle_id não for informado, busca ciclo ativo. Se não houver ciclo ativo, cria sem ciclo.
     """
     try:
         if not current_user.company_id:
@@ -163,14 +163,9 @@ async def create_objective(
         # Determinar cycle_id
         cycle_id = objective_data.cycle_id
         if not cycle_id:
-            # Buscar ciclo ativo
+            # Buscar ciclo ativo (opcional)
             active_cycle_id = await get_active_cycle_id(str(current_user.company_id))
-            if not active_cycle_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Nenhum ciclo ativo encontrado. Crie e ative um ciclo primeiro."
-                )
-            cycle_id = active_cycle_id
+            cycle_id = active_cycle_id  # Pode ser None se não houver ciclo ativo
         else:
             # Verificar se o ciclo pertence à empresa
             cycle_check = supabase_admin.from_('cycles').select('id').eq(
@@ -202,12 +197,15 @@ async def create_objective(
             'description': objective_data.description,
             'owner_id': str(owner_id),
             'company_id': str(current_user.company_id),
-            'cycle_id': str(cycle_id),
             'status': 'PLANNED',
             'progress': 0.0,
             'created_at': 'now()',
             'updated_at': 'now()'
         }
+        
+        # Adicionar cycle_id apenas se existir
+        if cycle_id:
+            objective_db_data['cycle_id'] = str(cycle_id)
         
         # Inserir objetivo
         insert_response = supabase_admin.from_('objectives').insert(objective_db_data).execute()
@@ -280,7 +278,7 @@ async def get_objective(
             'created_at': obj_data['created_at'],
             'updated_at': obj_data['updated_at'],
             'owner_name': obj_data['owner']['name'] if obj_data.get('owner') else None,
-            'cycle_name': obj_data['cycle']['name'] if obj_data.get('cycle') else 'Ciclo não encontrado',
+            'cycle_name': obj_data['cycle']['name'] if obj_data.get('cycle') and obj_data['cycle'] else None,
             'key_results_count': await get_key_results_count(obj_data['id'])
         }
         
