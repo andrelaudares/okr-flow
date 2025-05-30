@@ -368,6 +368,12 @@ Cria um novo usuário na empresa. Apenas owners e admins podem criar usuários. 
 }
 ```
 
+**Nota sobre campos:** 
+- `cpf_cnpj` não é obrigatório para usuários criados por owners/admins
+- `team_id` é opcional
+- O usuário criado herda automaticamente a `company_id` do criador
+- O usuário já inicia ativo (`is_active: true`)
+
 **Exemplo de Requisição (`curl`):**
 ```bash
 curl -X POST "http://localhost:8000/api/users" \
@@ -534,3 +540,41 @@ curl -X PUT "http://localhost:8000/api/users/b2c3d4e5-f6g7-8901-2345-678901abcde
 - `403 Forbidden`: Sem permissão para alterar status.
 - `404 Not Found`: Usuário não encontrado.
 - `500 Internal Server Error`: Erro ao alterar status.
+
+---
+
+## Correções de Bugs Implementadas
+
+### ✅ Bug: Objetivos sem ciclo obrigatório
+**Problema:** Não era possível criar objetivos sem escolher um ciclo ativo.
+
+**Solução:** 
+- Campo `cycle_id` na tabela `objectives` agora aceita NULL
+- Lógica de criação de objetivos permite valores NULL para `cycle_id`
+- Busca automática por ciclo ativo é opcional
+
+### ✅ Bug: Usuários não aparecendo na empresa
+**Problema:** Erro de constraint UNIQUE no campo `cpf_cnpj` ao criar usuários.
+
+**Solução:**
+- Campo `cpf_cnpj` na tabela `users` agora aceita NULL
+- Modelo `UserProfile` atualizado para permitir `cpf_cnpj: Optional[str]`
+- Usuários criados por owners/admins não precisam informar CPF/CNPJ
+
+### ✅ Bug: Login de usuários inativos
+**Problema:** Usuários com `is_active = false` não conseguiam fazer login.
+
+**Solução:**
+- Removida verificação de `is_active` no endpoint de login
+- Usuários podem fazer login independente do status ativo/inativo
+- Novos usuários já iniciam como ativos por padrão
+
+### 📝 Script SQL necessário:
+Execute no Supabase SQL Editor:
+```sql
+-- Permitir cycle_id NULL em objectives
+ALTER TABLE objectives ALTER COLUMN cycle_id DROP NOT NULL;
+
+-- Permitir cpf_cnpj NULL em users  
+ALTER TABLE users ALTER COLUMN cpf_cnpj DROP NOT NULL;
+```

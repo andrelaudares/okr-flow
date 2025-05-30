@@ -16,7 +16,7 @@ class UserDB(BaseModel):
     email: str
     username: str
     name: str
-    cpf_cnpj: str
+    cpf_cnpj: Optional[str] = None
     asaas_customer_id: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
@@ -71,7 +71,7 @@ class UserProfile(BaseModel):
     email: str
     username: str
     name: str
-    cpf_cnpj: str
+    cpf_cnpj: Optional[str] = None
     asaas_customer_id: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None

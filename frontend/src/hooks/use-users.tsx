@@ -35,7 +35,7 @@ export const useUsers = () => {
       if (filters.limit) params.append('limit', filters.limit.toString());
       if (filters.offset) params.append('offset', filters.offset.toString());
 
-      const response = await api.get(`/api/users/?${params.toString()}`);
+      const response = await api.get(`/api/users?${params.toString()}`);
       return response.data;
     },
     enabled: !!localStorage.getItem('nobugOkrToken'),
@@ -45,7 +45,7 @@ export const useUsers = () => {
   // Mutation para criar usuário
   const createUserMutation = useMutation({
     mutationFn: async (userData: CreateUserData): Promise<User> => {
-      const response = await api.post('/api/users/', userData);
+      const response = await api.post('/api/users', userData);
       return response.data;
     },
     onSuccess: (newUser) => {

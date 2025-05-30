@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional
 from uuid import uuid4
 
 from ..dependencies import get_current_user
@@ -8,6 +8,15 @@ from ..utils.supabase import supabase_admin
 
 router = APIRouter()
 
+# Modelo para resposta da listagem de usuários  
+from pydantic import BaseModel
+
+class UsersListResponse(BaseModel):
+    users: List[UserList]
+    total: int
+    has_more: bool
+    filters_applied: dict
+
 @router.get("/me", response_model=UserProfile, summary="Retorna os dados do usuário logado")
 async def read_users_me(current_user: UserProfile = Depends(get_current_user)):
     """
@@ -15,11 +24,19 @@ async def read_users_me(current_user: UserProfile = Depends(get_current_user)):
     """
     return current_user
 
-@router.get("/", response_model=List[UserList], summary="Lista usuários da empresa")
-async def list_users(current_user: UserProfile = Depends(get_current_user)):
+@router.get("/", response_model=UsersListResponse, summary="Lista usuários da empresa")
+async def list_users(
+    current_user: UserProfile = Depends(get_current_user),
+    search: Optional[str] = Query(None, description="Buscar por nome ou email"),
+    role: Optional[str] = Query(None, description="Filtrar por role"),
+    is_active: Optional[bool] = Query(None, description="Filtrar por status ativo"),
+    limit: int = Query(10, ge=1, le=100, description="Limite de resultados"),
+    offset: int = Query(0, ge=0, description="Offset para paginação")
+):
     """
     Lista todos os usuários da mesma empresa do usuário logado.
-    Apenas usuários ativos são mostrados para não-owners.
+    Suporta filtros de busca, role e status ativo.
+    Retorna lista paginada com metadados.
     """
     try:
         if not current_user.company_id:
@@ -27,19 +44,47 @@ async def list_users(current_user: UserProfile = Depends(get_current_user)):
         
         # Buscar usuários da mesma empresa
         query = supabase_admin.from_('users').select(
-            "id, email, username, name, role, team_id, is_owner, is_active, created_at"
+            "id, email, username, name, role, team_id, is_owner, is_active, created_at",
+            count='exact'
         ).eq('company_id', str(current_user.company_id))
         
-        # Se não for owner, mostrar apenas usuários ativos
-        if not current_user.is_owner:
-            query = query.eq('is_active', True)
+        # Aplicar filtros
+        if search:
+            # No Supabase, usamos ilike para busca case-insensitive
+            query = query.or_(f"name.ilike.%{search}%,email.ilike.%{search}%")
+        
+        if role:
+            query = query.eq('role', role)
             
+        if is_active is not None:
+            query = query.eq('is_active', is_active)
+        elif not current_user.is_owner:
+            # Se não for owner, mostrar apenas usuários ativos por padrão
+            query = query.eq('is_active', True)
+        
+        # Aplicar paginação
+        query = query.range(offset, offset + limit - 1)
+        
         response = query.execute()
         
-        if not response.data:
-            return []
-            
-        return [UserList(**user) for user in response.data]
+        users_data = response.data or []
+        total_count = response.count or 0
+        
+        users_list = [UserList(**user) for user in users_data]
+        has_more = offset + len(users_data) < total_count
+        
+        return UsersListResponse(
+            users=users_list,
+            total=total_count,
+            has_more=has_more,
+            filters_applied={
+                "search": search,
+                "role": role,
+                "is_active": is_active,
+                "limit": limit,
+                "offset": offset
+            }
+        )
         
     except Exception as e:
         print(f"DEBUG: Erro ao listar usuários: {e}")

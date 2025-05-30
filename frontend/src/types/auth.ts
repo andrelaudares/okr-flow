@@ -10,8 +10,10 @@ export interface User {
   role: UserRole;
   is_owner: boolean;
   is_active: boolean;
-  company_id: string;
+  company_id?: string;
+  team_id?: string;
   cpf_cnpj?: string;
+  asaas_customer_id?: string;
   phone?: string;
   address?: string;
   description?: string;
