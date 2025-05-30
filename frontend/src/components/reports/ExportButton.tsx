@@ -17,12 +17,16 @@ interface ExportButtonProps {
   className?: string;
   variant?: 'default' | 'outline' | 'ghost';
   size?: 'default' | 'sm' | 'lg' | 'icon';
+  exportConfig?: Partial<ExportConfig>;
+  customLabel?: string;
 }
 
 const ExportButton: React.FC<ExportButtonProps> = ({
   className,
   variant = 'outline',
-  size = 'sm'
+  size = 'sm',
+  exportConfig,
+  customLabel
 }) => {
   const { exportReport, getReportStatus, downloadReport } = useReports();
   const { filters } = useObjectiveFilters();
@@ -86,7 +90,18 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     setExportingFormat(format);
     
     try {
-      const config: ExportConfig = {
+      // Usar configuração personalizada se fornecida, senão usar configuração padrão do dashboard
+      const config: ExportConfig = exportConfig ? {
+        name: exportConfig.name || `Relatório - ${new Date().toLocaleDateString('pt-BR')}`,
+        report_type: exportConfig.report_type || 'DASHBOARD',
+        format,
+        filters: {
+          ...exportConfig.filters,
+          include_key_results: exportConfig.filters?.include_key_results ?? true,
+          include_checkins: exportConfig.filters?.include_checkins ?? true
+        },
+        include_charts: format === 'PDF'
+      } : {
         name: `Relatório Dashboard - ${new Date().toLocaleDateString('pt-BR')}`,
         report_type: 'DASHBOARD',
         format,
@@ -139,7 +154,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
           ) : (
             <Download className="h-4 w-4 mr-2" />
           )}
-          {isExporting ? `Gerando ${exportingFormat}...` : 'Exportar'}
+          {isExporting ? `Gerando ${exportingFormat}...` : (customLabel || 'Exportar')}
         </Button>
       </DropdownMenuTrigger>
       

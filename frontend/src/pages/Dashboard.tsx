@@ -4,7 +4,6 @@ import DashboardStatsCards from '@/components/dashboard/DashboardStatsCards';
 import ObjectiveFilters from '@/components/objectives/ObjectiveFilters';
 import ObjectiveCard from '@/components/objectives/ObjectiveCard';
 import ObjectiveForm from '@/components/objectives/ObjectiveForm';
-import ExportButton from '@/components/reports/ExportButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useObjectives, useObjectiveFilters } from '@/hooks/use-objectives';
@@ -86,8 +85,7 @@ const Dashboard = () => {
             <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
           </div>
           
-          {/* Botão de exportação */}
-          <ExportButton />
+          
         </div>
         
         {/* Cards de Estatísticas e Progresso */}

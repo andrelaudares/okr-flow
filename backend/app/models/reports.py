@@ -23,6 +23,7 @@ class ReportType(str, Enum):
     KEY_RESULTS = "KEY_RESULTS"
     DASHBOARD = "DASHBOARD"
     COMPLETE = "COMPLETE"
+    SINGLE_OBJECTIVE = "SINGLE_OBJECTIVE"
 
 class ReportFilters(BaseModel):
     """Filtros para aplicar na geração do relatório"""
@@ -30,6 +31,7 @@ class ReportFilters(BaseModel):
     status: Optional[List[str]] = None
     owner_id: Optional[str] = None
     cycle_id: Optional[str] = None
+    objective_id: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     include_key_results: bool = True

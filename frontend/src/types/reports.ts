@@ -9,13 +9,14 @@ export interface ExportFormat {
 
 export interface ExportConfig {
   name: string;
-  report_type: 'DASHBOARD' | 'OBJECTIVES' | 'KEY_RESULTS' | 'COMPLETE';
+  report_type: 'DASHBOARD' | 'OBJECTIVES' | 'KEY_RESULTS' | 'COMPLETE' | 'SINGLE_OBJECTIVE';
   format: 'CSV' | 'EXCEL' | 'PDF';
   filters: {
     search?: string;
     status?: string[];
     owner_id?: string;
     cycle_id?: string;
+    objective_id?: string;
     start_date?: string;
     end_date?: string;
     include_key_results?: boolean;

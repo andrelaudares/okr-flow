@@ -33,6 +33,87 @@ async def get_company_data(company_id: str):
         print(f"DEBUG: Erro ao buscar empresa: {e}")
         return None
 
+async def get_single_objective_for_report(company_id: str, objective_id: str) -> Optional[ObjectiveReportData]:
+    """Busca dados detalhados de um objetivo específico para relatório"""
+    try:
+        # Buscar o objetivo
+        response = supabase_admin.from_('objectives').select(
+            '''
+            id, title, description, owner_id, company_id, cycle_id, 
+            status, progress, created_at, updated_at,
+            owner:users!owner_id(name),
+            cycle:cycles!cycle_id(name)
+            '''
+        ).eq('company_id', company_id).eq('id', objective_id).single().execute()
+        
+        if not response.data:
+            return None
+        
+        obj = response.data
+        
+        # Buscar Key Results detalhados do objetivo
+        kr_response = supabase_admin.from_('key_results').select(
+            '''
+            id, title, description, objective_id, owner_id, target_value,
+            current_value, start_value, unit, status, progress, confidence_level,
+            created_at, updated_at,
+            owner:users!owner_id(name)
+            '''
+        ).eq('objective_id', objective_id).execute()
+        
+        kr_data = kr_response.data if kr_response.data else []
+        
+        # Contar Key Results
+        kr_count = len(kr_data)
+        kr_completed = len([kr for kr in kr_data if kr.get('status') == 'COMPLETED'])
+        
+        # Formatar Key Results para incluir no relatório
+        formatted_key_results = []
+        for kr in kr_data:
+            # Buscar check-ins do Key Result
+            checkins_response = supabase_admin.from_('kr_checkins').select(
+                'id, checkin_date, value_at_checkin, notes, confidence_level_at_checkin'
+            ).eq('key_result_id', kr['id']).order('checkin_date', desc=True).limit(5).execute()
+            
+            checkins_data = checkins_response.data if checkins_response.data else []
+            
+            formatted_key_results.append({
+                'id': kr['id'],
+                'title': kr['title'],
+                'description': kr.get('description'),
+                'objective_id': kr['objective_id'],
+                'target_value': float(kr.get('target_value', 0)) if kr.get('target_value') else None,
+                'current_value': float(kr.get('current_value', 0)) if kr.get('current_value') else None,
+                'start_value': float(kr.get('start_value', 0)) if kr.get('start_value') else None,
+                'unit': kr.get('unit'),
+                'status': kr.get('status'),
+                'progress': float(kr.get('progress', 0)) if kr.get('progress') else 0.0,
+                'confidence_level': float(kr.get('confidence_level', 0)) if kr.get('confidence_level') else None,
+                'owner_name': kr['owner']['name'] if kr.get('owner') else None,
+                'created_at': kr['created_at'],
+                'updated_at': kr['updated_at'],
+                'recent_checkins': checkins_data
+            })
+        
+        return ObjectiveReportData(
+            id=obj['id'],
+            title=obj['title'],
+            description=obj.get('description'),
+            owner_name=obj['owner']['name'] if obj.get('owner') else None,
+            cycle_name=obj['cycle']['name'] if obj.get('cycle') else 'Sem ciclo',
+            status=obj.get('status', 'PLANNED'),
+            progress=float(obj.get('progress', 0)),
+            created_at=datetime.fromisoformat(obj['created_at'].replace('Z', '+00:00')),
+            updated_at=datetime.fromisoformat(obj['updated_at'].replace('Z', '+00:00')),
+            key_results_count=kr_count,
+            key_results_completed=kr_completed,
+            key_results=formatted_key_results
+        )
+    
+    except Exception as e:
+        print(f"DEBUG: Erro ao buscar objetivo para relatório: {e}")
+        return None
+
 async def get_objectives_for_report(company_id: str, filters: ReportFilters) -> List[ObjectiveReportData]:
     """Busca objetivos formatados para relatório"""
     try:
@@ -115,13 +196,17 @@ async def get_objectives_for_report(company_id: str, filters: ReportFilters) -> 
 async def get_key_results_for_report(company_id: str, filters: ReportFilters) -> List[KeyResultReportData]:
     """Busca Key Results formatados para relatório"""
     try:
-        # Primeiro, buscar objetivos da empresa
-        objectives_response = supabase_admin.from_('objectives').select('id').eq('company_id', company_id).execute()
-        
-        if not objectives_response.data:
-            return []
-        
-        objective_ids = [obj['id'] for obj in objectives_response.data]
+        # Se filtro por objetivo específico, usar diretamente
+        if filters.objective_id:
+            objective_ids = [filters.objective_id]
+        else:
+            # Primeiro, buscar objetivos da empresa
+            objectives_response = supabase_admin.from_('objectives').select('id').eq('company_id', company_id).execute()
+            
+            if not objectives_response.data:
+                return []
+            
+            objective_ids = [obj['id'] for obj in objectives_response.data]
         
         # Buscar Key Results
         query = supabase_admin.from_('key_results').select(
@@ -377,7 +462,32 @@ async def export_report(
         if report_request.report_type in [ReportType.DASHBOARD, ReportType.COMPLETE]:
             dashboard_data = await get_dashboard_data_for_report(company_id)
         
-        if report_request.report_type in [ReportType.OBJECTIVES, ReportType.COMPLETE]:
+        if report_request.report_type == ReportType.SINGLE_OBJECTIVE:
+            # Exportação de objetivo específico
+            if not report_request.filters.objective_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="objective_id é obrigatório para relatório de objetivo único"
+                )
+            
+            single_objective = await get_single_objective_for_report(
+                company_id, 
+                report_request.filters.objective_id
+            )
+            
+            if not single_objective:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Objetivo não encontrado"
+                )
+            
+            objectives = [single_objective]
+            
+            # Para objetivo individual, os Key Results já estão incluídos no objetivo
+            # Não precisamos buscar separadamente
+            key_results = []
+        
+        elif report_request.report_type in [ReportType.OBJECTIVES, ReportType.COMPLETE]:
             objectives = await get_objectives_for_report(company_id, report_request.filters)
         
         if report_request.report_type in [ReportType.KEY_RESULTS, ReportType.COMPLETE]:

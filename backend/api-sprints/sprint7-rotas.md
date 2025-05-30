@@ -1,6 +1,10 @@
-
-
 ## Sistema de Relatórios
+
+**✅ Status: Funcional e Testado**
+- Relatórios individuais de objetivos funcionando
+- Download automático implementado  
+- Layout PDF profissional com Key Results detalhados
+- Correção de bugs nas colunas do banco de dados
 
 ### GET /api/reports/formats
 Retorna os formatos de exportação disponíveis no sistema.
@@ -63,11 +67,27 @@ Gera um relatório para exportação baseado nos filtros especificados.
 }
 ```
 
+**Exemplo para Objetivo Individual:**
+```json
+{
+  "name": "Objetivo - Aumentar Vendas - Janeiro 2024",
+  "report_type": "SINGLE_OBJECTIVE",
+  "format": "PDF",
+  "filters": {
+    "objective_id": "uuid-do-objetivo",
+    "include_key_results": true,
+    "include_checkins": true
+  },
+  "include_charts": true
+}
+```
+
 **Tipos de Relatório:**
 - `DASHBOARD`: Resumo executivo e métricas gerais
 - `OBJECTIVES`: Lista detalhada de objetivos com Key Results
 - `KEY_RESULTS`: Lista detalhada de Key Results com check-ins
 - `COMPLETE`: Relatório completo com todos os dados
+- `SINGLE_OBJECTIVE`: Relatório detalhado de um objetivo específico com todos os seus Key Results
 
 **Formatos Disponíveis:**
 - `CSV`: Arquivo CSV separado por ponto e vírgula

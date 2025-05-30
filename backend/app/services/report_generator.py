@@ -314,6 +314,13 @@ class ReportGenerator:
         styles = getSampleStyleSheet()
         story = []
         
+        # Verificar se é relatório de objetivo individual
+        is_single_objective = (
+            content.metadata.report_type == "SINGLE_OBJECTIVE" and 
+            content.objectives and 
+            len(content.objectives) == 1
+        )
+        
         # Estilos customizados
         title_style = ParagraphStyle(
             'CustomTitle',
@@ -357,16 +364,30 @@ class ReportGenerator:
             spaceAfter=6
         )
         
-        normal_style = ParagraphStyle(
-            'NormalText',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#4b5563'),
-            spaceAfter=6
-        )
+        normal_style = styles['Normal']
         
-        # Cabeçalho do relatório
-        story.append(Paragraph("📊 Relatório OKR", title_style))
+        # Título do relatório
+        if content.dashboard_data:
+            company_name = content.dashboard_data.company_name
+        else:
+            company_name = "Empresa"
+        
+        if is_single_objective:
+            # Título específico para objetivo individual
+            objective = content.objectives[0]
+            report_title = f"📋 Relatório Detalhado do Objetivo"
+            story.append(Paragraph(report_title, title_style))
+            story.append(Spacer(1, 20))
+            
+            # Destaque do objetivo
+            obj_title = f"🎯 {objective.title}"
+            story.append(Paragraph(obj_title, subtitle_style))
+            story.append(Spacer(1, 15))
+        else:
+            # Título padrão para relatórios gerais
+            report_title = f"📊 Relatório OKR - {company_name}"
+            story.append(Paragraph(report_title, title_style))
+            story.append(Spacer(1, 30))
         
         if content.dashboard_data:
             # Informações básicas em uma tabela elegante
@@ -505,8 +526,268 @@ class ReportGenerator:
         
         # Objetivos Detalhados
         if content.objectives:
-            story.append(Paragraph("🎯 Objetivos Detalhados", subtitle_style))
-            story.append(Spacer(1, 10))
+            if is_single_objective:
+                # Layout especial para objetivo individual
+                objective = content.objectives[0]
+                
+                # Informações principais em destaque
+                obj_info = [
+                    ['👤 Responsável', objective.owner_name or 'Não atribuído'],
+                    ['🔄 Ciclo', objective.cycle_name],
+                    ['📊 Status', self._get_status_display(objective.status)],
+                    ['📈 Progresso', f"{objective.progress:.1f}%"],
+                    ['🔑 Key Results', f"{objective.key_results_completed}/{objective.key_results_count} concluídos"],
+                    ['📅 Criado em', objective.created_at.strftime('%d/%m/%Y %H:%M') if objective.created_at else 'N/A'],
+                    ['🔄 Última atualização', objective.updated_at.strftime('%d/%m/%Y %H:%M') if objective.updated_at else 'N/A']
+                ]
+                
+                if objective.description:
+                    obj_info.append(['📝 Descrição', objective.description])
+                
+                obj_table = Table(obj_info, colWidths=[2*inch, 4*inch])
+                obj_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+                    ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#4f46e5')),
+                    ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#1f2937')),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                    ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 11),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 10),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0')),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP')
+                ]))
+                
+                story.append(obj_table)
+                story.append(Spacer(1, 20))
+                
+                # Barra de progresso destacada
+                progress_text = f"🎯 Progresso do Objetivo: {objective.progress:.1f}%"
+                story.append(Paragraph(progress_text, section_style))
+                story.append(Spacer(1, 10))
+                
+                # Barra de progresso visual maior
+                progress_width = 5 * inch
+                progress_height = 0.4 * inch
+                
+                # Cor baseada no progresso
+                if objective.progress >= 90:
+                    progress_color = colors.HexColor('#059669')  # Verde escuro
+                    bg_color = colors.HexColor('#d1fae5')
+                elif objective.progress >= 70:
+                    progress_color = colors.HexColor('#10b981')  # Verde
+                    bg_color = colors.HexColor('#ecfdf5')
+                elif objective.progress >= 50:
+                    progress_color = colors.HexColor('#f59e0b')  # Amarelo
+                    bg_color = colors.HexColor('#fef3c7')
+                elif objective.progress >= 25:
+                    progress_color = colors.HexColor('#f97316')  # Laranja
+                    bg_color = colors.HexColor('#fed7aa')
+                else:
+                    progress_color = colors.HexColor('#ef4444')  # Vermelho
+                    bg_color = colors.HexColor('#fecaca')
+                
+                # Simular barra de progresso com tabela
+                progress_data = [['']]
+                progress_table = Table(progress_data, colWidths=[progress_width], rowHeights=[progress_height])
+                progress_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, 0), bg_color),
+                    ('GRID', (0, 0), (0, 0), 2, progress_color)
+                ]))
+                
+                story.append(progress_table)
+                story.append(Spacer(1, 30))
+                
+                # Seção de Key Results detalhada - usar os que já estão no objetivo
+                if objective.key_results and len(objective.key_results) > 0:
+                    story.append(Paragraph("🔑 Key Results Detalhados", subtitle_style))
+                    story.append(Spacer(1, 15))
+                    
+                    for i, kr in enumerate(objective.key_results):
+                        if i > 0:
+                            story.append(Spacer(1, 20))
+                        
+                        # Card do Key Result
+                        kr_title = f"🎯 {kr.get('title', 'Key Result')}"
+                        story.append(Paragraph(kr_title, section_style))
+                        story.append(Spacer(1, 8))
+                        
+                        # Informações do Key Result
+                        kr_info = [
+                            ['📊 Status', self._get_status_display(kr.get('status', 'PLANNED'))],
+                            ['📈 Progresso', f"{kr.get('progress', 0):.1f}%"],
+                            ['👤 Responsável', kr.get('owner_name') or 'Não atribuído']
+                        ]
+                        
+                        target_value = kr.get('target_value')
+                        current_value = kr.get('current_value')
+                        
+                        if target_value is not None and target_value > 0:
+                            kr_info.extend([
+                                ['🎯 Meta', f"{target_value:.2f}"],
+                                ['📊 Valor Atual', f"{current_value:.2f}" if current_value is not None else "0.00"],
+                                ['📏 Unidade', kr.get('unit') or 'N/A']
+                            ])
+                        
+                        confidence = kr.get('confidence_level')
+                        if confidence is not None:
+                            confidence_percent = confidence * 100
+                            kr_info.append(['🎯 Confiança', f"{confidence_percent:.0f}%"])
+                        
+                        description = kr.get('description')
+                        if description:
+                            kr_info.append(['📝 Descrição', description])
+                        
+                        # Dados de check-ins
+                        recent_checkins = kr.get('recent_checkins', [])
+                        checkins_count = len(recent_checkins)
+                        last_checkin_date = None
+                        
+                        if recent_checkins:
+                            last_checkin = recent_checkins[0]
+                            if 'checkin_date' in last_checkin:
+                                try:
+                                    last_checkin_date = datetime.fromisoformat(last_checkin['checkin_date'].replace('Z', '+00:00'))
+                                except:
+                                    pass
+                        
+                        # Tratar datas
+                        created_at_str = 'N/A'
+                        updated_at_str = 'N/A'
+                        
+                        if kr.get('created_at'):
+                            try:
+                                created_date = datetime.fromisoformat(kr['created_at'].replace('Z', '+00:00'))
+                                created_at_str = created_date.strftime('%d/%m/%Y')
+                            except:
+                                pass
+                        
+                        if kr.get('updated_at'):
+                            try:
+                                updated_date = datetime.fromisoformat(kr['updated_at'].replace('Z', '+00:00'))
+                                updated_at_str = updated_date.strftime('%d/%m/%Y')
+                            except:
+                                pass
+                        
+                        kr_info.extend([
+                            ['📅 Criado em', created_at_str],
+                            ['🔄 Atualizado em', updated_at_str],
+                            ['📊 Check-ins', f"{checkins_count} realizados"],
+                            ['📅 Último check-in', last_checkin_date.strftime('%d/%m/%Y') if last_checkin_date else 'Nunca']
+                        ])
+                        
+                        kr_table = Table(kr_info, colWidths=[1.8*inch, 4.2*inch])
+                        kr_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#ffffff')),
+                            ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#6b7280')),
+                            ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#1f2937')),
+                            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                            ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
+                            ('FONTSIZE', (0, 0), (-1, -1), 10),
+                            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                            ('TOPPADDING', (0, 0), (-1, -1), 8),
+                            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+                            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.HexColor('#f9fafb'), colors.white] * 10)
+                        ]))
+                        
+                        story.append(kr_table)
+                        
+                        # Barra de progresso do Key Result
+                        story.append(Spacer(1, 8))
+                        kr_progress_value = kr.get('progress', 0)
+                        kr_progress_text = f"Progresso: {kr_progress_value:.1f}%"
+                        story.append(Paragraph(kr_progress_text, normal_style))
+                        
+                        # Barra de progresso do KR
+                        kr_progress_width = 3.5 * inch
+                        kr_progress_height = 0.25 * inch
+                        
+                        if kr_progress_value >= 80:
+                            kr_progress_color = colors.HexColor('#10b981')
+                            kr_bg_color = colors.HexColor('#d1fae5')
+                        elif kr_progress_value >= 60:
+                            kr_progress_color = colors.HexColor('#f59e0b')
+                            kr_bg_color = colors.HexColor('#fef3c7')
+                        elif kr_progress_value >= 30:
+                            kr_progress_color = colors.HexColor('#f97316')
+                            kr_bg_color = colors.HexColor('#fed7aa')
+                        else:
+                            kr_progress_color = colors.HexColor('#ef4444')
+                            kr_bg_color = colors.HexColor('#fecaca')
+                        
+                        kr_progress_data = [['']]
+                        kr_progress_table = Table(kr_progress_data, colWidths=[kr_progress_width], rowHeights=[kr_progress_height])
+                        kr_progress_table.setStyle(TableStyle([
+                            ('BACKGROUND', (0, 0), (0, 0), kr_bg_color),
+                            ('GRID', (0, 0), (0, 0), 1, kr_progress_color)
+                        ]))
+                        
+                        story.append(kr_progress_table)
+                        
+                        # Seção de check-ins detalhados (se houver)
+                        if recent_checkins:
+                            story.append(Spacer(1, 15))
+                            story.append(Paragraph("📊 Check-ins Recentes:", normal_style))
+                            story.append(Spacer(1, 8))
+                            
+                            checkin_data = [['Data', 'Valor', 'Confiança', 'Notas']]
+                            
+                            for checkin in recent_checkins[:3]:  # Últimos 3 check-ins
+                                checkin_date_str = 'N/A'
+                                if checkin.get('checkin_date'):
+                                    try:
+                                        checkin_date = datetime.fromisoformat(checkin['checkin_date'].replace('Z', '+00:00'))
+                                        checkin_date_str = checkin_date.strftime('%d/%m/%Y')
+                                    except:
+                                        pass
+                                
+                                value_str = 'N/A'
+                                if checkin.get('value_at_checkin') is not None:
+                                    value_str = f"{float(checkin['value_at_checkin']):.2f}"
+                                
+                                confidence_str = 'N/A'
+                                if checkin.get('confidence_level_at_checkin') is not None:
+                                    conf_percent = float(checkin['confidence_level_at_checkin']) * 100
+                                    confidence_str = f"{conf_percent:.0f}%"
+                                
+                                notes = checkin.get('notes', '')
+                                if notes and len(notes) > 40:
+                                    notes = notes[:40] + '...'
+                                if not notes:
+                                    notes = 'Sem observações'
+                                
+                                checkin_data.append([
+                                    checkin_date_str,
+                                    value_str,
+                                    confidence_str,
+                                    notes
+                                ])
+                            
+                            checkin_table = Table(checkin_data, colWidths=[1*inch, 1*inch, 0.8*inch, 2.2*inch])
+                            checkin_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+                                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('ALIGN', (1, 1), (2, -1), 'CENTER'),
+                                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+                                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#faf5ff')])
+                            ]))
+                            
+                            story.append(checkin_table)
+            else:
+                # Layout padrão para múltiplos objetivos
+                story.append(Paragraph("🎯 Objetivos Detalhados", subtitle_style))
+                story.append(Spacer(1, 10))
             
             for i, obj in enumerate(content.objectives):  # Mostrar todos os objetivos
                 # Nova página a cada 2 objetivos para melhor organização
@@ -790,32 +1071,6 @@ class ReportGenerator:
         
         for rec in recommendations:
             story.append(Paragraph(rec, normal_style))
-            for kr in top_krs:
-                kr_data.append([
-                    kr.title[:30] + '...' if len(kr.title) > 30 else kr.title,
-                    kr.objective_title[:25] + '...' if len(kr.objective_title) > 25 else kr.objective_title,
-                    f"{kr.progress:.1f}%",
-                    self._get_status_display(kr.status)
-                ])
-            
-            kr_table = Table(kr_data, colWidths=[2*inch, 1.8*inch, 0.8*inch, 1*inch])
-            kr_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#7c3aed')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('ALIGN', (2, 1), (2, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')])
-            ]))
-            
-            story.append(kr_table)
         
         # Rodapé
         story.append(Spacer(1, 30))

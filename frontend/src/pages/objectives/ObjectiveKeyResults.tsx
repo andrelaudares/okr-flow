@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import KeyResultList from '@/components/key-results/KeyResultList';
+import ExportButton from '@/components/reports/ExportButton';
 import { useObjectives } from '@/hooks/use-objectives';
 import { ArrowLeft, Target } from 'lucide-react';
 import { Loading } from '@/components/ui/loading';
 import ErrorBoundary from '@/components/ui/error-boundary';
+import type { ExportConfig } from '@/types/reports';
 
 const ObjectiveKeyResults = () => {
   const { objectiveId } = useParams<{ objectiveId: string }>();
@@ -55,13 +57,13 @@ const ObjectiveKeyResults = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/objectives')}
+            onClick={() => navigate('../Dashboard')}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar
           </Button>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <div className="bg-nobug-100 p-2 rounded-lg">
               <Target className="h-5 w-5 text-nobug-600" />
             </div>
@@ -74,6 +76,22 @@ const ObjectiveKeyResults = () => {
               </p>
             </div>
           </div>
+
+          {/* Botão de Exportação */}
+          <ExportButton
+            variant="outline"
+            size="sm"
+            customLabel="Exportar Objetivo"
+            exportConfig={{
+              name: `Objetivo - ${objective.title} - ${new Date().toLocaleDateString('pt-BR')}`,
+              report_type: 'SINGLE_OBJECTIVE',
+              filters: {
+                objective_id: objective.id,
+                include_key_results: true,
+                include_checkins: true
+              }
+            }}
+          />
         </div>
 
         {/* Informações do Objetivo */}
