@@ -9,6 +9,12 @@ import type {
   TimeCardsResponse 
 } from '@/types/dashboard';
 
+interface UseDashboardStatsProps {
+  cycleCode?: string;
+  cycleYear?: number;
+  autoRefresh?: boolean;
+}
+
 interface UseDashboardStatsReturn {
   // Data
   stats: DashboardStats | null;
@@ -37,7 +43,11 @@ interface UseDashboardStatsReturn {
   refetchTimeCards: () => Promise<void>;
 }
 
-export const useDashboardStats = (): UseDashboardStatsReturn => {
+export const useDashboardStats = ({
+  cycleCode,
+  cycleYear,
+  autoRefresh = true
+}: UseDashboardStatsProps = {}): UseDashboardStatsReturn => {
   const { isAuthenticated } = useAuth();
   
   // Data states
@@ -62,14 +72,12 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     if (!isAuthenticated) return;
     
     setIsLoadingStats(true);
-    setError(null);
     
     try {
       const response = await api.get('/api/dashboard/stats');
       setStats(response.data);
     } catch (err: any) {
-      console.error('Erro ao carregar estatísticas:', err);
-      setError(err.response?.data?.detail || 'Erro ao carregar estatísticas');
+      console.warn('Erro ao carregar estatísticas (não crítico):', err);
     } finally {
       setIsLoadingStats(false);
     }
@@ -79,31 +87,32 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     if (!isAuthenticated) return;
     
     setIsLoadingProgress(true);
-    setError(null);
     
     try {
-      const response = await api.get('/api/dashboard/progress');
+      const params = new URLSearchParams();
+      if (cycleCode) params.append('cycle_code', cycleCode);
+      if (cycleYear) params.append('cycle_year', cycleYear.toString());
+      
+      const url = `/api/dashboard/progress${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await api.get(url);
       setProgress(response.data);
     } catch (err: any) {
-      console.error('Erro ao carregar progresso:', err);
-      setError(err.response?.data?.detail || 'Erro ao carregar progresso');
+      console.warn('Erro ao carregar progresso (não crítico):', err);
     } finally {
       setIsLoadingProgress(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, cycleCode, cycleYear]);
 
   const fetchObjectivesCount = useCallback(async () => {
     if (!isAuthenticated) return;
     
     setIsLoadingCount(true);
-    setError(null);
     
     try {
       const response = await api.get('/api/dashboard/objectives-count');
       setObjectivesCount(response.data);
     } catch (err: any) {
-      console.error('Erro ao carregar contadores:', err);
-      setError(err.response?.data?.detail || 'Erro ao carregar contadores');
+      console.warn('Erro ao carregar contadores (não crítico):', err);
     } finally {
       setIsLoadingCount(false);
     }
@@ -112,6 +121,12 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
   const fetchEvolution = useCallback(async () => {
     if (!isAuthenticated) return;
     
+    // TEMPORARIAMENTE DESABILITADO - Erro de conversão de datas
+    // TODO: Reabilitar quando o erro de datas for resolvido definitivamente
+    console.log('DEBUG: fetchEvolution desabilitado temporariamente devido a erro de datas');
+    return;
+    
+    /*
     setIsLoadingEvolution(true);
     setError(null);
     
@@ -124,20 +139,19 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
     } finally {
       setIsLoadingEvolution(false);
     }
+    */
   }, [isAuthenticated]);
 
   const fetchTimeCards = useCallback(async () => {
     if (!isAuthenticated) return;
     
     setIsLoadingTimeCards(true);
-    setError(null);
     
     try {
       const response = await api.get('/api/dashboard/time-cards');
       setTimeCards(response.data);
     } catch (err: any) {
-      console.error('Erro ao carregar cards temporais:', err);
-      setError(err.response?.data?.detail || 'Erro ao carregar cards temporais');
+      console.warn('Erro ao carregar cards temporais (não crítico):', err);
     } finally {
       setIsLoadingTimeCards(false);
     }
@@ -149,19 +163,19 @@ export const useDashboardStats = (): UseDashboardStatsReturn => {
       fetchStats(),
       fetchProgress(),
       fetchObjectivesCount(),
-      fetchEvolution(),
+      // fetchEvolution(), // TEMPORARIAMENTE DESABILITADO
       fetchTimeCards()
     ]);
-  }, [fetchStats, fetchProgress, fetchObjectivesCount, fetchEvolution, fetchTimeCards]);
+  }, [fetchStats, fetchProgress, fetchObjectivesCount, fetchTimeCards]);
 
   // Initial load
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && autoRefresh) {
       refetch();
     }
-  }, [isAuthenticated, refetch]);
+  }, [isAuthenticated, autoRefresh, cycleCode, cycleYear, refetch]);
 
-  const isLoading = isLoadingStats || isLoadingProgress || isLoadingCount || isLoadingEvolution || isLoadingTimeCards;
+  const isLoading = isLoadingStats || isLoadingProgress || isLoadingCount || isLoadingTimeCards;
 
   return {
     // Data

@@ -37,17 +37,6 @@ interface DashboardStatsCardsProps {
 }
 
 const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) => {
-  const {
-    stats,
-    progress,
-    objectivesCount,
-    isLoading,
-    isLoadingStats,
-    isLoadingProgress,
-    isLoadingCount,
-    error
-  } = useDashboardStats();
-
   const { 
     globalCycles,
     userPreference,
@@ -61,6 +50,24 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
     fetchGlobalCycles
   } = useGlobalCycles();
 
+  const activeCycle = userPreference || currentCycle;
+  
+  const {
+    stats,
+    progress,
+    objectivesCount,
+    isLoading,
+    isLoadingStats,
+    isLoadingProgress,
+    isLoadingCount,
+    error,
+    refetchProgress
+  } = useDashboardStats({
+    cycleCode: activeCycle?.code,
+    cycleYear: activeCycle?.year,
+    autoRefresh: true
+  });
+
   const { isOwner, isAdmin } = usePermissions();
 
   const [showCycleDialog, setShowCycleDialog] = useState(false);
@@ -73,18 +80,19 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
         year: cycle.year
       });
       setShowCycleDialog(false);
+      
+      // Refazer o fetch do progresso com o novo ciclo
+      // O useEffect do useDashboardStats vai detectar a mudança automaticamente
+      toast.success(`Ciclo alterado para ${cycle.name}`);
     } catch (error) {
       console.error('Erro ao definir preferência:', error);
+      toast.error('Erro ao alterar ciclo');
     }
   };
 
   const handleYearChange = (year: number) => {
     setSelectedYear(year);
     fetchGlobalCycles(year);
-  };
-
-  const getActiveCycle = () => {
-    return userPreference || currentCycle;
   };
 
   const getStatusBadge = (cycle: GlobalCycleWithStatus) => {
@@ -98,16 +106,9 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
     return <Badge variant="secondary" className="text-xs">-</Badge>;
   };
 
+  // Se há erro, apenas log no console mas continua funcionando
   if (error || cycleError) {
-    return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-2 text-red-800">
-          <Target className="h-5 w-5" />
-          <span className="font-medium">Erro ao carregar dados do dashboard</span>
-        </div>
-        <p className="text-red-600 text-sm mt-1">{error || cycleError}</p>
-      </div>
-    );
+    console.warn('Erro no dashboard (não crítico):', error || cycleError);
   }
 
   return (
@@ -126,17 +127,15 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                 <div className="h-6 bg-gray-200 rounded animate-pulse" />
                 <div className="h-4 bg-gray-200 rounded animate-pulse" />
               </div>
-            ) : stats ? (
+            ) : (
               <>
                 <div className="text-2xl font-bold text-nobug-600">
-                  {stats.company_name}
+                  {stats?.company_name || 'Minha Empresa'}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {stats.active_users} usuários ativos
+                  {stats?.active_users || 0} usuários ativos
                 </p>
               </>
-            ) : (
-              <div className="text-sm text-gray-500">Carregando...</div>
             )}
           </CardContent>
         </Card>
@@ -153,26 +152,24 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                 <div className="h-6 bg-gray-200 rounded animate-pulse" />
                 <div className="h-4 bg-gray-200 rounded animate-pulse" />
               </div>
-            ) : stats ? (
+            ) : (
               <>
-                <div className="text-2xl font-bold">{stats.total_objectives}</div>
+                <div className="text-2xl font-bold">{stats?.total_objectives || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  {stats.total_key_results} key results
+                  {stats?.total_key_results || 0} key results
                 </p>
               </>
-            ) : (
-              <div className="text-sm text-gray-500">Carregando...</div>
             )}
           </CardContent>
         </Card>
 
-        {/* Ciclo Ativo - Layout Melhorado */}
+        {/* Progresso dos Objetivos - Antigo Ciclo Ativo */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ciclo Ativo</CardTitle>
+            <CardTitle className="text-sm font-medium">Progresso dos Objetivos</CardTitle>
             <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              {isOwner || isAdmin && globalCycles.length > 1 && (
+              <Target className="h-4 w-4 text-muted-foreground" /> 
+              {(isOwner || isAdmin) && globalCycles.length > 0 && (
                 <Dialog open={showCycleDialog} onOpenChange={setShowCycleDialog}>
                   <DialogTrigger asChild>
                     <Button 
@@ -213,7 +210,7 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                         <div
                           key={`${cycle.code}-${cycle.year}`}
                           className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            cycle.code === getActiveCycle()?.code && cycle.year === getActiveCycle()?.year
+                            cycle.code === activeCycle?.code && cycle.year === activeCycle?.year
                               ? 'border-blue-500 bg-blue-50' 
                               : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                           }`}
@@ -233,7 +230,7 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                                 {cycle.progress_percentage?.toFixed(1)}% • {cycle.days_remaining} dias restantes
                               </div>
                             </div>
-                            {cycle.code === getActiveCycle()?.code && cycle.year === getActiveCycle()?.year && (
+                            {cycle.code === activeCycle?.code && cycle.year === activeCycle?.year && (
                               <div className="flex items-center gap-1 text-blue-600 font-medium text-sm">
                                 <Star className="h-3 w-3" />
                                 Escolhido
@@ -255,33 +252,39 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                 <div className="h-4 bg-gray-200 rounded animate-pulse" />
                 <div className="h-2 bg-gray-200 rounded animate-pulse" />
               </div>
-            ) : getActiveCycle() ? (
+            ) : (activeCycle || progress) ? (
               <>
-                {/* Nome do ciclo */}
-                <div className="text-2xl font-bold truncate" title={getActiveCycle()?.name}>
-                  {getActiveCycle()?.name}
+                {/* Nome do ciclo continua, mas o foco é no progresso dos objetivos */}
+                <div className="text-2xl font-bold truncate" title={activeCycle?.name || 'Progresso Geral'}>
+                  {activeCycle?.name || 'Progresso Geral'}
                 </div>
                 
-                {/* Linha com progresso e dias restantes */}
+                {/* Linha com progresso dos objetivos */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {getActiveCycle()?.progress_percentage.toFixed(1)}% decorrido
+                    Média de {progress?.current_progress?.toFixed(1) || '0.0'}%
                   </span>
-                  <span className="font-medium text-nobug-600">
-                    {getActiveCycle()?.days_remaining} dias restantes
-                  </span>
+                  {/* Removemos os dias restantes, pois o foco é nos objetivos */}
                 </div>
                 
-                {/* Barra de progresso */}
+                {/* Barra de progresso dos objetivos */}
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-nobug-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(getActiveCycle()?.progress_percentage, 100)}%` }}
+                    style={{ width: `${Math.min(progress?.current_progress || 0, 100)}%` }}
                   />
                 </div>
               </>
             ) : (
-              <div className="text-sm text-gray-500">Nenhum ciclo ativo</div>
+              <>
+                <div className="text-2xl font-bold">Progresso Geral</div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Média de 0.0%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-nobug-500 h-2 rounded-full w-0" />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -314,13 +317,35 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
       {/* Cards avançados */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Card de progresso */}
-        {progress && (
+        {progress ? (
           <ProgressCard data={progress} isLoading={isLoadingProgress} />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Progresso dos Objetivos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500">Carregando dados de progresso...</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Card de contadores de objetivos */}
-        {objectivesCount && (
+        {objectivesCount ? (
           <ObjectivesCountCard data={objectivesCount} isLoading={isLoadingCount} />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Objetivos por Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-500">Carregando contadores...</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

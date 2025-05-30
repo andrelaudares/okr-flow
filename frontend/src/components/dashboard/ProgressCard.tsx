@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, Calendar, Target } from 'lucide-react';
+import { TrendingUp, Target, CheckCircle } from 'lucide-react';
 import TrendIndicator from './TrendIndicator';
 import StatusColorBadge from './StatusColorBadge';
 import ProgressBar from './ProgressBar';
@@ -16,8 +16,8 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ data, isLoading }) => {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Progresso do Ciclo</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Progresso dos Objetivos</CardTitle>
+          <Target className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -35,15 +35,15 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ data, isLoading }) => {
 
   const variance = data.current_progress - data.expected_progress;
   const isAhead = variance > 0;
-  const isBehind = variance < -5; // Considera atrasado se mais de 5% abaixo do esperado
+  const isBehind = variance < -10; // Considera atrasado se mais de 10% abaixo do esperado
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Progresso do Ciclo</CardTitle>
+        <CardTitle className="text-sm font-medium">Progresso dos Objetivos</CardTitle>
         <div className="flex items-center gap-2">
           <StatusColorBadge status={data.status_color} />
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <Target className="h-4 w-4 text-muted-foreground" />
         </div>
       </CardHeader>
       <CardContent>
@@ -69,49 +69,46 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ data, isLoading }) => {
             />
           </div>
 
-          {/* Informações adicionais */}
+          {/* Informações dos objetivos */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <div className="flex items-center gap-1 text-gray-600 mb-1">
                 <Target className="h-3 w-3" />
-                <span>Esperado</span>
+                <span>Atual</span>
               </div>
               <span className="font-medium">
-                {data.expected_progress.toFixed(1)}%
+                {data.current_progress.toFixed(1)}%
               </span>
             </div>
             
             <div>
               <div className="flex items-center gap-1 text-gray-600 mb-1">
-                <Calendar className="h-3 w-3" />
-                <span>Variação</span>
+                <CheckCircle className="h-3 w-3" />
+                <span>Meta</span>
               </div>
-              <span className={`font-medium ${
+              <span className="font-medium text-nobug-600">
+                {data.expected_progress.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Variação e status */}
+          <div className="pt-2 border-t border-gray-100">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Variação</span>
+              <span className={`text-sm font-medium ${
                 isAhead ? 'text-green-600' : isBehind ? 'text-red-600' : 'text-gray-900'
               }`}>
                 {variance > 0 ? '+' : ''}{variance.toFixed(1)}%
               </span>
             </div>
-          </div>
-
-          {/* Timeline do ciclo */}
-          <div className="pt-2 border-t border-gray-100">
-            <div className="flex justify-between text-xs text-gray-600 mb-1">
-              <span>Dias do ciclo</span>
-              <span>{data.cycle_days_elapsed} de {data.cycle_days_total}</span>
-            </div>
-            <ProgressBar
-              current={data.cycle_days_elapsed}
-              total={data.cycle_days_total}
-              showPercentage={false}
-              size="sm"
-              variant="default"
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>Restam {data.cycle_days_remaining} dias</span>
-              <span>
-                {((data.cycle_days_elapsed / data.cycle_days_total) * 100).toFixed(0)}% do tempo
-              </span>
+            <div className="mt-2 text-xs text-gray-500">
+              {isAhead 
+                ? '🎯 Equipe está acima da meta esperada' 
+                : isBehind 
+                ? '⚠️ Progresso abaixo do esperado' 
+                : '✅ Progresso dentro do esperado'
+              }
             </div>
           </div>
         </div>

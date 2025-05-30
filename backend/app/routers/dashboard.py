@@ -174,6 +174,80 @@ async def get_all_company_cycles(company_id: str) -> List[CycleStatus]:
         print(f"DEBUG: Erro ao buscar ciclos da empresa: {e}")
         return []
 
+async def get_global_cycle_info(cycle_code: str, cycle_year: int) -> Optional[dict]:
+    """Busca informações de um ciclo global específico"""
+    try:
+        from .global_cycles import calculate_cycle_status
+        
+        response = supabase_admin.from_('global_cycles').select(
+            "*"
+        ).eq('code', cycle_code).eq('year', cycle_year).execute()
+        
+        if response.data:
+            cycle_data = response.data[0]
+            cycle_status = calculate_cycle_status(cycle_data)
+            return {
+                'progress_percentage': cycle_status.progress_percentage,
+                'days_total': cycle_status.days_total,
+                'days_elapsed': cycle_status.days_elapsed,
+                'days_remaining': cycle_status.days_remaining
+            }
+        
+        return None
+    except Exception as e:
+        print(f"DEBUG: Erro ao buscar ciclo global: {e}")
+        return None
+
+async def get_user_preferred_cycle_info(user_id: str, company_id: str) -> Optional[dict]:
+    """Busca informações do ciclo preferido pelo usuário"""
+    try:
+        from .global_cycles import calculate_cycle_status
+        
+        # Buscar preferência do usuário
+        pref_response = supabase_admin.from_('user_cycle_preferences').select(
+            "*"
+        ).eq('user_id', user_id).eq('company_id', company_id).execute()
+        
+        if pref_response.data:
+            preference = pref_response.data[0]
+            
+            # Buscar o ciclo global correspondente
+            cycle_response = supabase_admin.from_('global_cycles').select(
+                "*"
+            ).eq('code', preference['global_cycle_code']).eq('year', preference['year']).execute()
+            
+            if cycle_response.data:
+                cycle_data = cycle_response.data[0]
+                cycle_status = calculate_cycle_status(cycle_data)
+                return {
+                    'progress_percentage': cycle_status.progress_percentage,
+                    'days_total': cycle_status.days_total,
+                    'days_elapsed': cycle_status.days_elapsed,
+                    'days_remaining': cycle_status.days_remaining
+                }
+        
+        # Se não há preferência, usar ciclo atual padrão
+        current_year = datetime.now().year
+        current_response = supabase_admin.from_('global_cycles').select(
+            "*"
+        ).eq('year', current_year).eq('is_current', True).execute()
+        
+        if current_response.data:
+            # Pegar o primeiro ciclo atual (pode haver múltiplos tipos de ciclo atuais)
+            cycle_data = current_response.data[0]
+            cycle_status = calculate_cycle_status(cycle_data)
+            return {
+                'progress_percentage': cycle_status.progress_percentage,
+                'days_total': cycle_status.days_total,
+                'days_elapsed': cycle_status.days_elapsed,
+                'days_remaining': cycle_status.days_remaining
+            }
+        
+        return None
+    except Exception as e:
+        print(f"DEBUG: Erro ao buscar preferência do usuário: {e}")
+        return None
+
 @router.get("/time-cards", response_model=TimeCardsResponse, summary="Cards temporais do dashboard")
 async def get_time_cards(current_user: UserProfile = Depends(get_current_user)):
     """
@@ -423,10 +497,17 @@ async def get_dashboard_stats(current_user: UserProfile = Depends(get_current_us
         )
 
 @router.get("/progress", response_model=ProgressData, summary="Progresso geral do dashboard")
-async def get_dashboard_progress(current_user: UserProfile = Depends(get_current_user)):
+async def get_dashboard_progress(
+    cycle_code: Optional[str] = None,
+    cycle_year: Optional[int] = None,
+    current_user: UserProfile = Depends(get_current_user)
+):
     """
     Retorna dados de progresso geral incluindo progresso atual,
     progresso esperado, tendência e informações do ciclo.
+    
+    Se cycle_code e cycle_year não forem especificados, usa a preferência do usuário
+    ou o ciclo ativo padrão.
     """
     try:
         if not current_user.company_id:
@@ -440,7 +521,27 @@ async def get_dashboard_progress(current_user: UserProfile = Depends(get_current
         
         # Buscar dados necessários
         objectives_data = await get_objectives_data(company_id)
-        active_cycle = await get_active_cycle_status(company_id)
+        
+        # Determinar qual ciclo usar
+        cycle_info = None
+        
+        if cycle_code and cycle_year:
+            # Usar ciclo específico passado como parâmetro
+            cycle_info = await get_global_cycle_info(cycle_code, cycle_year)
+        else:
+            # Usar preferência do usuário ou ciclo atual
+            cycle_info = await get_user_preferred_cycle_info(current_user.id, current_user.company_id)
+            
+            # Se não há preferência, tenta usar ciclo ativo legado
+            if not cycle_info:
+                active_cycle = await get_active_cycle_status(company_id)
+                if active_cycle:
+                    cycle_info = {
+                        'progress_percentage': active_cycle.progress_percentage,
+                        'days_total': active_cycle.days_total,
+                        'days_elapsed': active_cycle.days_elapsed,
+                        'days_remaining': active_cycle.days_remaining
+                    }
         
         # Calcular progresso atual (média dos objetivos)
         if objectives_data:
@@ -449,14 +550,43 @@ async def get_dashboard_progress(current_user: UserProfile = Depends(get_current
         else:
             current_progress = 0.0
         
-        # Calcular progresso esperado baseado no ciclo
-        if active_cycle:
-            expected_progress = active_cycle.progress_percentage
-            cycle_days_total = active_cycle.days_total
-            cycle_days_elapsed = active_cycle.days_elapsed
-            cycle_days_remaining = active_cycle.days_remaining
+        # Calcular progresso esperado baseado em metas de objetivos
+        # Para o card de "Progresso dos Objetivos", usamos uma meta de performance ideal
+        if cycle_info:
+            # Usar o progresso temporal do ciclo como base para a meta
+            cycle_time_progress = cycle_info['progress_percentage']
+            
+            # Meta de progresso dos objetivos baseada no tempo decorrido
+            # Se estamos em 50% do ciclo, esperamos pelo menos 40% de progresso nos objetivos
+            # Se estamos em 75% do ciclo, esperamos pelo menos 60% de progresso nos objetivos  
+            # Se estamos em 100% do ciclo, esperamos pelo menos 80% de progresso nos objetivos
+            if cycle_time_progress <= 25:
+                expected_objectives_progress = max(10.0, cycle_time_progress * 0.6)
+            elif cycle_time_progress <= 50:
+                expected_objectives_progress = max(20.0, cycle_time_progress * 0.8)
+            elif cycle_time_progress <= 75:
+                expected_objectives_progress = max(40.0, cycle_time_progress * 0.85)
+            else:
+                expected_objectives_progress = max(60.0, cycle_time_progress * 0.9)
+            
+            expected_progress = min(85.0, expected_objectives_progress)  # Máximo de 85% como meta
+            cycle_days_total = cycle_info['days_total']
+            cycle_days_elapsed = cycle_info['days_elapsed']
+            cycle_days_remaining = cycle_info['days_remaining']
         else:
-            expected_progress = 0.0
+            # Se não há ciclo, usar uma meta padrão baseada no número de objetivos
+            if objectives_data:
+                # Meta baseada no número de objetivos: mais objetivos = meta um pouco menor
+                objectives_count = len(objectives_data)
+                if objectives_count <= 3:
+                    expected_progress = 70.0  # Meta alta para poucos objetivos
+                elif objectives_count <= 6:
+                    expected_progress = 60.0  # Meta média
+                else:
+                    expected_progress = 50.0  # Meta mais conservadora para muitos objetivos
+            else:
+                expected_progress = 0.0
+            
             cycle_days_total = 365
             cycle_days_elapsed = 0
             cycle_days_remaining = 365
@@ -593,14 +723,35 @@ async def get_dashboard_evolution(current_user: UserProfile = Depends(get_curren
         # Definir período de análise (último mês ou ciclo ativo)
         if active_cycle:
             try:
-                # Converter timestamp para date (lidar com formato ISO com timezone)
-                period_start = datetime.fromisoformat(active_cycle.start_date.replace('Z', '+00:00')).date()
-                period_end = datetime.fromisoformat(active_cycle.end_date.replace('Z', '+00:00')).date()
+                # Tratar diferentes formatos de data
+                start_date_str = active_cycle.start_date
+                end_date_str = active_cycle.end_date
+                
+                if start_date_str and end_date_str:
+                    # Tentar diferentes formatos de data
+                    try:
+                        # Formato ISO completo com timezone
+                        if 'T' in start_date_str:
+                            period_start = datetime.fromisoformat(start_date_str.replace('Z', '+00:00')).date()
+                            period_end = datetime.fromisoformat(end_date_str.replace('Z', '+00:00')).date()
+                        else:
+                            # Formato simples YYYY-MM-DD
+                            period_start = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+                            period_end = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+                    except ValueError as parse_error:
+                        print(f"DEBUG: Erro ao parsear datas (start='{start_date_str}', end='{end_date_str}'): {parse_error}. Usando fallback.")
+                        raise
+                else:
+                    print(f"DEBUG: Datas do ciclo estão vazias. Usando fallback.")
+                    raise ValueError("Datas vazias")
+
             except Exception as date_error:
-                print(f"DEBUG: Erro ao converter datas do ciclo: {date_error}")
+                print(f"DEBUG: Erro geral ao processar datas do ciclo: {date_error}. Usando fallback para período de 30 dias.")
+                # Fallback seguro
                 period_start = today - timedelta(days=30)
                 period_end = today
         else:
+            print(f"DEBUG: Nenhum ciclo ativo encontrado. Usando período padrão de 30 dias.")
             period_start = today - timedelta(days=30)
             period_end = today
         
