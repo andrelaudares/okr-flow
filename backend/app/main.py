@@ -24,7 +24,7 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://127.0.0.1:5173", "http://127.0.0.1:8080","okr-flow-git-main-andrelaudares-projects.vercel.app", "okr-flow.vercel.app", "okr-flow-kdzrqf3ft-andrelaudares-projects.vercel.app"],  # Frontend URLs
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://127.0.0.1:5173", "http://127.0.0.1:8080","okr-flow-git-main-andrelaudares-projects.vercel.app", "okr-flow.vercel.app", "https://okr-flow-production.up.railway.app", "okr-flow-kdzrqf3ft-andrelaudares-projects.vercel.app"],  # Frontend URLs
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
