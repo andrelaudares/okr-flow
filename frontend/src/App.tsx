@@ -11,7 +11,6 @@ import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
-import CompanySettings from "./pages/CompanySettings";
 import Cycles from "./pages/cycles/Cycles";
 import ObjectiveKeyResults from "./pages/objectives/ObjectiveKeyResults";
 import CompanySettingsPage from "./pages/company/CompanySettings";

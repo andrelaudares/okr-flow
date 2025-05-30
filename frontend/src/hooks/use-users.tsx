@@ -50,6 +50,7 @@ export const useUsers = () => {
     },
     onSuccess: (newUser) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['company'] });
       toast.success(`Usuário ${newUser.name} criado com sucesso!`);
     },
     onError: (error: any) => {
@@ -66,6 +67,7 @@ export const useUsers = () => {
     },
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['company'] });
       toast.success(`Usuário ${updatedUser.name} atualizado com sucesso!`);
     },
     onError: (error: any) => {
@@ -81,6 +83,7 @@ export const useUsers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['company'] });
       toast.success('Usuário desativado com sucesso!');
     },
     onError: (error: any) => {

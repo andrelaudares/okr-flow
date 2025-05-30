@@ -370,6 +370,7 @@ Cria um novo usuário na empresa. Apenas owners e admins podem criar usuários. 
 
 **Nota sobre campos:** 
 - `cpf_cnpj` não é obrigatório para usuários criados por owners/admins
+- `username` é opcional (será gerado automaticamente se não fornecido)
 - `team_id` é opcional
 - O usuário criado herda automaticamente a `company_id` do criador
 - O usuário já inicia ativo (`is_active: true`)

@@ -172,7 +172,7 @@ const ObjectiveCard: React.FC<ObjectiveCardProps> = ({
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               <span>
-                {objective.key_results_count} Key Result{objective.key_results_count !== 1 ? 's' : ''}
+                {objective.key_results_count} Meta{objective.key_results_count !== 1 ? 's' : ''}
               </span>
             </div>
             
@@ -184,7 +184,7 @@ const ObjectiveCard: React.FC<ObjectiveCardProps> = ({
             </div>
           </div>
 
-          {/* Botão gerenciar Key Results */}
+          {/* Botão gerenciar Metas */}
           {onManageKeyResults && (
             <div className="mt-4 pt-3 border-t">
               <Button
@@ -194,7 +194,7 @@ const ObjectiveCard: React.FC<ObjectiveCardProps> = ({
                 className="w-full"
               >
                 <Settings className="h-4 w-4 mr-2" />
-                Gerenciar Key Results
+                Gerenciar Metas
               </Button>
             </div>
           )}
@@ -208,7 +208,7 @@ const ObjectiveCard: React.FC<ObjectiveCardProps> = ({
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir o objetivo "{objective.title}"?
-              Esta ação não pode ser desfeita e todos os Key Results associados também serão removidos.
+              Esta ação não pode ser desfeita e todas as Metas associadas também serão removidas.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

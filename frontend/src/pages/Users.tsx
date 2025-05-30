@@ -63,6 +63,7 @@ const Users = () => {
     setPage,
     deleteUser,
     isDeleting,
+    refetch,
   } = useUsers();
 
   const [search, setSearch] = useState(filters.search || '');
@@ -151,7 +152,7 @@ const Users = () => {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-red-500">Erro ao carregar usuários. Tente novamente.</p>
-              <Button onClick={() => window.location.reload()} className="mt-4">
+              <Button onClick={() => refetch()} className="mt-4">
                 Recarregar
               </Button>
             </div>
@@ -178,7 +179,7 @@ const Users = () => {
           {!canManageUsers && "Visualize os membros da sua equipe"}
         </p>
         <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
-          <span>Total: {total} usuários</span>
+          <span>Total: {total || 0} usuários</span>
           {filters.search && <span>• Filtrados por: "{filters.search}"</span>}
           {filters.role && <span>• Role: {getRoleDisplayName(filters.role)}</span>}
         </div>
@@ -275,7 +276,7 @@ const Users = () => {
         <CardContent>
           {isLoading ? (
             <Loading text="Carregando usuários..." />
-          ) : users.length === 0 ? (
+          ) : (!users || users.length === 0) ? (
             <div className="text-center py-8">
               <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">Nenhum usuário encontrado</p>
@@ -290,7 +291,7 @@ const Users = () => {
             <>
               {/* Tabela de usuários */}
               <div className="space-y-4">
-                {users.map((user) => (
+                {users && users.map((user) => (
                   <div
                     key={user.id}
                     className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"

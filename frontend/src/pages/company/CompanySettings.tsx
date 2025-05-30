@@ -148,12 +148,12 @@ const CompanySettings = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Total de usuários</span>
-                  <span className="font-semibold">{company?.users_count || 0}</span>
+                  <span className="font-semibold">{company?.total_users || 0}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">Usuários ativos</span>
                   <span className="font-semibold text-green-600">
-                    {company?.active_users_count || 0}
+                    {company?.active_users || 0}
                   </span>
                 </div>
               </div>

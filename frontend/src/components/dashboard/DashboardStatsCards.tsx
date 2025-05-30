@@ -156,7 +156,7 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
               <>
                 <div className="text-2xl font-bold">{stats?.total_objectives || 0}</div>
                 <p className="text-xs text-muted-foreground">
-                  {stats?.total_key_results || 0} key results
+                  {stats?.total_key_results || 0} metas
                 </p>
               </>
             )}

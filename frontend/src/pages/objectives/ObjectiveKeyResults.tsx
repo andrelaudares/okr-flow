@@ -72,7 +72,7 @@ const ObjectiveKeyResults = () => {
                 {objective.title}
               </h1>
               <p className="text-sm text-gray-600">
-                Gerenciar Key Results
+                Gerenciar Metas
               </p>
             </div>
           </div>
@@ -137,7 +137,7 @@ const ObjectiveKeyResults = () => {
           </CardContent>
         </Card>
 
-        {/* Lista de Key Results */}
+        {/* Lista de Metas */}
         <KeyResultList 
           objectiveId={objective.id} 
           objectiveTitle={objective.title}
