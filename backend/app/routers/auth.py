@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from postgrest.exceptions import APIError
 from uuid import uuid4
 import traceback
+from pydantic import BaseModel
 
 from ..models.user import UserRegister, UserLogin, UserProfile, UserRegisterResponse
 from ..utils.supabase import supabase_client, supabase_admin
@@ -13,6 +14,14 @@ from ..utils.asaas import asaas_request, create_asaas_customer
 from ..dependencies import get_current_user
 
 router = APIRouter()
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+
+class UpdatePasswordRequest(BaseModel):
+    access_token: str
+    refresh_token: str
+    new_password: str
 
 def check_supabase_config():
     """Verifica se o Supabase está configurado"""
@@ -130,7 +139,7 @@ async def register_user(user_data: UserRegister):
             'role': 'ADMIN',
             'company_id': company_id,
             'is_owner': True,
-            'is_active': True
+            'is_active': False  # Novo usuário precisa ser aprovado
         }
 
         try:
@@ -166,7 +175,7 @@ async def register_user(user_data: UserRegister):
         
         
         return UserRegisterResponse(
-            message="Usuário registrado com sucesso. Aguarde aprovação para liberação de acesso.",
+            message="Cadastro realizado com sucesso! Seu acesso será liberado em até 48 horas após análise do nosso time. Você receberá um email quando estiver aprovado.",
             user_id=user_id,
             requires_approval=True
         )
@@ -296,4 +305,79 @@ async def get_current_user_data(current_user: UserProfile = Depends(get_current_
     """
     Retorna dados completos do usuário autenticado.
     """
-    return current_user 
+    return current_user
+
+@router.post("/reset-password", summary="Solicitar reset de senha")
+async def request_password_reset(reset_data: ResetPasswordRequest):
+    """
+    Envia email de reset de senha usando o Supabase Auth.
+    Apenas usuários ativos podem solicitar reset.
+    """
+    check_supabase_config()
+    
+    try:
+        # Verificar se usuário existe e está ativo
+        user_check = supabase_admin.from_('users').select("is_active").eq('email', reset_data.email).execute()
+        
+        if not user_check.data:
+            # Por segurança, retornamos sucesso mesmo se usuário não existe
+            return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
+        
+        user_profile = user_check.data[0]
+        
+        if not user_profile.get('is_active', True):
+            # Usuário inativo não pode fazer reset
+            return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
+        
+        # Enviar email de reset pelo Supabase Auth
+        reset_response = supabase_admin.auth.reset_password_email(reset_data.email)
+        
+        print(f"DEBUG: Reset de senha solicitado para: {reset_data.email}")
+        
+        return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
+        
+    except Exception as e:
+        print(f"DEBUG: Erro no reset de senha: {e}")
+        # Por segurança, sempre retorna sucesso
+        return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
+
+@router.post("/update-password", summary="Atualizar senha com token de reset")
+async def update_password_with_token(update_data: UpdatePasswordRequest):
+    """
+    Atualiza a senha usando tokens de reset recebidos por email.
+    """
+    check_supabase_config()
+    
+    try:
+        # Verificar e usar os tokens para autenticar
+        session_response = supabase_admin.auth.set_session(
+            access_token=update_data.access_token,
+            refresh_token=update_data.refresh_token
+        )
+        
+        if not session_response.session:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tokens inválidos ou expirados")
+        
+        # Atualizar senha
+        user_response = supabase_admin.auth.update_user({
+            "password": update_data.new_password
+        })
+        
+        if not user_response.user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha")
+        
+        # Verificar se usuário ainda está ativo
+        user_check = supabase_admin.from_('users').select("is_active").eq('email', user_response.user.email).execute()
+        
+        if user_check.data and not user_check.data[0].get('is_active', True):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário desativado")
+        
+        print(f"DEBUG: Senha atualizada com sucesso para: {user_response.user.email}")
+        
+        return {"message": "Senha atualizada com sucesso"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Erro ao atualizar senha: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha. Tokens podem estar inválidos ou expirados.") 

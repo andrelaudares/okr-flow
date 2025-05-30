@@ -8,6 +8,7 @@ from ..models.user import UserProfile, UserRole
 from ..models.cycle import (
     Cycle, CycleCreate, CycleUpdate, CycleStatus
 )
+from ..models.global_cycle import GlobalCycleWithStatus
 from ..utils.supabase import supabase_admin
 
 router = APIRouter()
@@ -165,6 +166,7 @@ async def create_cycle(cycle_data: CycleCreate, current_user: UserProfile = Depe
 async def get_active_cycle(current_user: UserProfile = Depends(get_current_user)):
     """
     Retorna o ciclo ativo atual da empresa com status calculado.
+    Se não houver ciclo ativo personalizado, usa a preferência do usuário dos ciclos globais.
     """
     try:
         if not current_user.company_id:
@@ -173,21 +175,71 @@ async def get_active_cycle(current_user: UserProfile = Depends(get_current_user)
                 detail="Usuário não possui empresa associada"
             )
         
-        # Buscar ciclo ativo
+        # Primeiro, tentar buscar ciclo ativo personalizado (legado)
         response = supabase_admin.from_('cycles').select(
             "id, name, start_date, end_date, is_active, created_at, updated_at"
         ).eq('company_id', str(current_user.company_id)).eq('is_active', True).execute()
         
-        if not response.data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="Nenhum ciclo ativo encontrado"
-            )
+        if response.data:
+            # Se há ciclo ativo personalizado, usar ele
+            active_cycle = response.data[0]
+            cycle_status = calculate_cycle_status(active_cycle)
+            return cycle_status
         
-        active_cycle = response.data[0]
-        cycle_status = calculate_cycle_status(active_cycle)
+        # Se não há ciclo ativo personalizado, tentar usar preferência global do usuário
+        try:
+            # Buscar preferência do usuário
+            pref_response = supabase_admin.from_('user_cycle_preferences').select(
+                "*"
+            ).eq('user_id', str(current_user.id)).eq('company_id', str(current_user.company_id)).execute()
+            
+            if pref_response.data:
+                preference = pref_response.data[0]
+                
+                # Buscar o ciclo global correspondente
+                global_cycle_response = supabase_admin.from_('global_cycles').select(
+                    "*"
+                ).eq('code', preference['global_cycle_code']).eq('year', preference['year']).execute()
+                
+                if global_cycle_response.data:
+                    global_cycle = global_cycle_response.data[0]
+                    
+                    # Converter para formato compatível com CycleStatus
+                    cycle_data = {
+                        'id': global_cycle['id'],
+                        'name': global_cycle['name'],
+                        'start_date': global_cycle['start_date'],
+                        'end_date': global_cycle['end_date'],
+                        'is_active': global_cycle['is_current']
+                    }
+                    return calculate_cycle_status(cycle_data)
+            
+            # Se não há preferência, usar ciclo atual baseado na data
+            current_year = datetime.now().year
+            current_global = supabase_admin.from_('global_cycles').select(
+                "*"
+            ).eq('year', current_year).eq('is_current', True).execute()
+            
+            if current_global.data:
+                global_cycle = current_global.data[0]
+                cycle_data = {
+                    'id': global_cycle['id'],
+                    'name': global_cycle['name'],
+                    'start_date': global_cycle['start_date'],
+                    'end_date': global_cycle['end_date'],
+                    'is_active': global_cycle['is_current']
+                }
+                return calculate_cycle_status(cycle_data)
+                
+        except Exception as e:
+            print(f"DEBUG: Erro ao buscar ciclo global: {e}")
+            # Se falha, continuar com erro original
         
-        return cycle_status
+        # Se nenhuma opção funcionar
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Nenhum ciclo ativo encontrado"
+        )
         
     except HTTPException:
         raise

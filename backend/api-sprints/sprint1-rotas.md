@@ -198,6 +198,82 @@ curl -X GET "http://localhost:8000/api/auth/me" \
 ```
 - `401 Unauthorized`: Token inválido ou ausente.
 
+### `POST /api/auth/reset-password`
+Solicita reset de senha enviando email com instruções. Apenas usuários ativos podem solicitar reset.
+
+- **Endpoint:** `/api/auth/reset-password`
+- **Método:** `POST`
+
+**Header Parameters:**
+- `Content-Type`: `application/json`
+
+**Request Body:**
+```json
+{
+  "email": "usuario@empresa.com"
+}
+```
+
+**Exemplo de Requisição (`curl`):**
+```bash
+curl -X POST "http://localhost:8000/api/auth/reset-password" \
+-H "Content-Type: application/json" \
+-d '{
+  "email": "usuario@empresa.com"
+}'
+```
+
+**Responses:**
+- `200 OK`: Solicitação processada (sempre retorna sucesso por segurança).
+```json
+{
+  "message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."
+}
+```
+
+---
+
+### `POST /api/auth/update-password`
+Atualiza senha usando tokens de reset recebidos por email.
+
+- **Endpoint:** `/api/auth/update-password`
+- **Método:** `POST`
+
+**Header Parameters:**
+- `Content-Type`: `application/json`
+
+**Request Body:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "new_password": "novaSenhaSegura123"
+}
+```
+
+**Exemplo de Requisição (`curl`):**
+```bash
+curl -X POST "http://localhost:8000/api/auth/update-password" \
+-H "Content-Type: application/json" \
+-d '{
+  "access_token": "TOKEN_DO_EMAIL",
+  "refresh_token": "REFRESH_TOKEN_DO_EMAIL",
+  "new_password": "novaSenhaSegura123"
+}'
+```
+
+**Responses:**
+- `200 OK`: Senha atualizada com sucesso.
+```json
+{
+  "message": "Senha atualizada com sucesso"
+}
+```
+- `400 Bad Request`: Tokens inválidos ou expirados.
+- `401 Unauthorized`: Usuário desativado.
+
+---
+
 ## 2. Gestão de Usuários (`/api/users`)
 
 ### `GET /api/users/me`

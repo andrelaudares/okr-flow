@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const ResetPassword = () => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -18,12 +20,22 @@ const ResetPassword = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Implementar reset de senha com a nova API
-      // Por enquanto, apenas simula o envio
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success("Funcionalidade em desenvolvimento. Entre em contato com o administrador.");
-      setResetSent(true);
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success("Instruções enviadas por email");
+        setResetSent(true);
+      } else {
+        toast.error(data.detail || "Erro ao enviar email de redefinição");
+      }
     } catch (error: any) {
       toast.error("Erro ao enviar email de redefinição");
       console.error("Error in password reset:", error);
@@ -51,7 +63,7 @@ const ResetPassword = () => {
             <CardTitle className="text-2xl font-bold text-center">Recuperar senha</CardTitle>
             <CardDescription className="text-center">
               {resetSent 
-                ? "Funcionalidade em desenvolvimento" 
+                ? "Instruções enviadas por email" 
                 : "Insira seu email para receber instruções de recuperação"}
             </CardDescription>
           </CardHeader>
@@ -59,8 +71,11 @@ const ResetPassword = () => {
             {resetSent ? (
               <div className="text-center space-y-4">
                 <p className="text-sm text-gray-500">
-                  Esta funcionalidade está em desenvolvimento. 
-                  Por favor, entre em contato com o administrador do sistema.
+                  Enviamos instruções para redefinir sua senha para o email informado.
+                  Verifique sua caixa de entrada e siga as instruções.
+                </p>
+                <p className="text-xs text-gray-400">
+                  Não recebeu o email? Verifique a pasta de spam ou tente novamente em alguns minutos.
                 </p>
                 <Button 
                   onClick={() => navigate("/login")} 

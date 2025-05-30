@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import signal
 import sys
-from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results, reports, analytics, notifications
+from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results, reports, analytics, notifications, global_cycles
 
 # Lifecycle manager para startup/shutdown
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(reports.router, prefix="/api/reports", tags=["Relatórios"])
 app.include_router(analytics.router, tags=["Analytics"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["Notificações"])
 app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Assinaturas"])
+app.include_router(global_cycles.router, prefix="/api/global-cycles", tags=["Ciclos Globais"])
 
 @app.get("/", summary="Health Check")
 async def read_root():

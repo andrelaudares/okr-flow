@@ -90,7 +90,7 @@ const RegisterForm = () => {
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold text-center">Criar conta</CardTitle>
         <CardDescription className="text-center">
-          Registre-se como proprietário da sua empresa
+          Cadastre-se para solicitar acesso ao sistema. Seu perfil será analisado em até 48 horas.
         </CardDescription>
       </CardHeader>
       <CardContent>

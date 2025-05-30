@@ -130,8 +130,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setState(prev => ({ ...prev, isLoading: false }));
       
-      // Backend retorna mensagem de aguardo aprovação
-      toast.success(responseData.message || 'Registro realizado com sucesso!');
+      // Mostrar popup de sucesso com informações de aprovação
+      toast.success(
+        responseData.message || 'Cadastro realizado! Aguarde aprovação em até 48 horas.',
+        {
+          duration: 8000, // 8 segundos para dar tempo de ler
+          description: 'Você receberá um email quando seu acesso for liberado.'
+        }
+      );
+      
       console.log('Registro realizado com sucesso:', responseData);
       
       // Redirecionar para login pois registro requer aprovação

@@ -8,7 +8,9 @@ import {
   Calendar,
   RefreshCw,
   ArrowUpDown,
-  Clock
+  Clock,
+  Star,
+  Settings
 } from 'lucide-react';
 import {
   Dialog,
@@ -20,14 +22,15 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useDashboardStats } from '@/hooks/dashboard/useDashboardStats';
-import { useCycles } from '@/hooks/use-cycles';
+import { useGlobalCycles } from '@/hooks/use-global-cycles';
 import { usePermissions } from '@/hooks/use-auth';
 import ProgressCard from './ProgressCard';
 import ObjectivesCountCard from './ObjectivesCountCard';
 import { Loading } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import type { DashboardStats } from '@/types/dashboard';
-import type { Cycle } from '@/types/cycles';
+import type { GlobalCycleWithStatus } from '@/types/global-cycles';
+import { getCycleIcon, formatCyclePeriod, getCycleTypeLabel } from '@/types/global-cycles';
 
 interface DashboardStatsCardsProps {
   className?: string;
@@ -46,72 +49,63 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
   } = useDashboardStats();
 
   const { 
-    cycles, 
-    activeCycle, 
-    isActivating, 
-    activateCycle,
-    isLoadingActive 
-  } = useCycles();
+    globalCycles,
+    userPreference,
+    currentCycle,
+    availableYears,
+    isLoading: isLoadingCycles,
+    isLoadingPreference,
+    isUpdatingPreference,
+    error: cycleError,
+    updateUserPreference,
+    fetchGlobalCycles
+  } = useGlobalCycles();
 
   const { isOwner, isAdmin } = usePermissions();
-  const canManageCycles = isOwner || isAdmin;
 
-  const [isChangingCycle, setIsChangingCycle] = useState(false);
   const [showCycleDialog, setShowCycleDialog] = useState(false);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
-  const handleChangeCycle = async (cycle: Cycle) => {
-    if (!canManageCycles) {
-      toast.error('Você não tem permissão para alterar o ciclo ativo');
-      return;
-    }
-
-    if (cycle.id === activeCycle?.id) {
-      setShowCycleDialog(false);
-      return;
-    }
-
-    setIsChangingCycle(true);
+  const handleChangeCycle = async (cycle: GlobalCycleWithStatus) => {
     try {
-      await activateCycle(cycle.id);
-      toast.success(`Ciclo "${cycle.name}" ativado com sucesso!`);
+      await updateUserPreference({
+        global_cycle_code: cycle.code,
+        year: cycle.year
+      });
       setShowCycleDialog(false);
     } catch (error) {
-      console.error('Erro ao alterar ciclo:', error);
-      toast.error('Erro ao alterar ciclo ativo');
-    } finally {
-      setIsChangingCycle(false);
+      console.error('Erro ao definir preferência:', error);
     }
   };
 
-  const getAvailableCycles = () => {
-    return cycles.filter(cycle => 
-      cycle.status === 'PLANNED' || cycle.status === 'ACTIVE'
-    );
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    fetchGlobalCycles(year);
   };
 
-  const getStatusBadge = (cycle: Cycle) => {
-    switch (cycle.status) {
-      case 'ACTIVE':
-        return <Badge className="bg-green-100 text-green-800 text-xs">Ativo</Badge>;
-      case 'PLANNED':
-        return <Badge className="bg-blue-100 text-blue-800 text-xs">Planejado</Badge>;
-      case 'COMPLETED':
-        return <Badge className="bg-gray-100 text-gray-800 text-xs">Concluído</Badge>;
-      case 'EXPIRED':
-        return <Badge className="bg-red-100 text-red-800 text-xs">Expirado</Badge>;
-      default:
-        return <Badge variant="secondary" className="text-xs">{cycle.status}</Badge>;
+  const getActiveCycle = () => {
+    return userPreference || currentCycle;
+  };
+
+  const getStatusBadge = (cycle: GlobalCycleWithStatus) => {
+    if (cycle.is_current) {
+      return <Badge className="bg-green-100 text-green-800 text-xs">🔥 Atual</Badge>;
+    } else if (cycle.is_future) {
+      return <Badge className="bg-blue-100 text-blue-800 text-xs">📅 Futuro</Badge>;
+    } else if (cycle.is_past) {
+      return <Badge className="bg-gray-100 text-gray-800 text-xs">✅ Passado</Badge>;
     }
+    return <Badge variant="secondary" className="text-xs">-</Badge>;
   };
 
-  if (error) {
+  if (error || cycleError) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
         <div className="flex items-center gap-2 text-red-800">
           <Target className="h-5 w-5" />
           <span className="font-medium">Erro ao carregar dados do dashboard</span>
         </div>
-        <p className="text-red-600 text-sm mt-1">{error}</p>
+        <p className="text-red-600 text-sm mt-1">{error || cycleError}</p>
       </div>
     );
   }
@@ -178,37 +172,49 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
             <CardTitle className="text-sm font-medium">Ciclo Ativo</CardTitle>
             <div className="flex items-center gap-1">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              {canManageCycles && getAvailableCycles().length > 1 && (
+              {isOwner || isAdmin && globalCycles.length > 1 && (
                 <Dialog open={showCycleDialog} onOpenChange={setShowCycleDialog}>
                   <DialogTrigger asChild>
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       className="h-6 w-6 p-0 hover:bg-gray-100"
-                      disabled={isChangingCycle || isActivating}
                       title="Trocar ciclo ativo"
                     >
-                      {isChangingCycle || isActivating ? (
-                        <RefreshCw className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3" />
-                      )}
+                      <Settings className="h-3 w-3" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
+                  <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Trocar Ciclo Ativo</DialogTitle>
+                      <DialogTitle>Escolher Ciclo</DialogTitle>
                       <DialogDescription>
-                        Selecione qual ciclo você deseja ativar. O ciclo atual será desativado.
+                        Selecione seu ciclo preferido para organizar seus OKRs
                       </DialogDescription>
                     </DialogHeader>
+                    
+                    {/* Seletor de Ano */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-sm text-gray-600">Ano:</span>
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => handleYearChange(Number(e.target.value))}
+                        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {availableYears.map(year => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
                     <div className="space-y-3 mt-4">
-                      {getAvailableCycles().map((cycle) => (
+                      {globalCycles
+                        .filter(cycle => cycle.year === selectedYear)
+                        .map((cycle) => (
                         <div
-                          key={cycle.id}
+                          key={`${cycle.code}-${cycle.year}`}
                           className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            cycle.id === activeCycle?.id 
-                              ? 'border-nobug-500 bg-nobug-50' 
+                            cycle.code === getActiveCycle()?.code && cycle.year === getActiveCycle()?.year
+                              ? 'border-blue-500 bg-blue-50' 
                               : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                           }`}
                           onClick={() => handleChangeCycle(cycle)}
@@ -216,20 +222,21 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
+                                <span className="text-lg">{getCycleIcon(cycle.code)}</span>
                                 <span className="font-medium">{cycle.name}</span>
                                 {getStatusBadge(cycle)}
                               </div>
                               <div className="text-sm text-gray-600 mt-1">
-                                {new Date(cycle.start_date).toLocaleDateString('pt-BR')} - {' '}
-                                {new Date(cycle.end_date).toLocaleDateString('pt-BR')}
+                                {formatCyclePeriod(cycle)} • {getCycleTypeLabel(cycle.type)}
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
-                                {cycle.progress_percentage.toFixed(1)}% • {cycle.days_remaining} dias restantes
+                                {cycle.progress_percentage?.toFixed(1)}% • {cycle.days_remaining} dias restantes
                               </div>
                             </div>
-                            {cycle.id === activeCycle?.id && (
-                              <div className="text-nobug-600 font-medium text-sm">
-                                Atual
+                            {cycle.code === getActiveCycle()?.code && cycle.year === getActiveCycle()?.year && (
+                              <div className="flex items-center gap-1 text-blue-600 font-medium text-sm">
+                                <Star className="h-3 w-3" />
+                                Escolhido
                               </div>
                             )}
                           </div>
@@ -242,26 +249,26 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {isLoadingActive ? (
+            {isLoadingCycles ? (
               <div className="space-y-2">
                 <div className="h-6 bg-gray-200 rounded animate-pulse" />
                 <div className="h-4 bg-gray-200 rounded animate-pulse" />
                 <div className="h-2 bg-gray-200 rounded animate-pulse" />
               </div>
-            ) : activeCycle ? (
+            ) : getActiveCycle() ? (
               <>
                 {/* Nome do ciclo */}
-                <div className="text-2xl font-bold truncate" title={activeCycle.name}>
-                  {activeCycle.name}
+                <div className="text-2xl font-bold truncate" title={getActiveCycle()?.name}>
+                  {getActiveCycle()?.name}
                 </div>
                 
                 {/* Linha com progresso e dias restantes */}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {activeCycle.progress_percentage.toFixed(1)}% decorrido
+                    {getActiveCycle()?.progress_percentage.toFixed(1)}% decorrido
                   </span>
                   <span className="font-medium text-nobug-600">
-                    {activeCycle.days_remaining} dias restantes
+                    {getActiveCycle()?.days_remaining} dias restantes
                   </span>
                 </div>
                 
@@ -269,7 +276,7 @@ const DashboardStatsCards: React.FC<DashboardStatsCardsProps> = ({ className }) 
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-nobug-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(activeCycle.progress_percentage, 100)}%` }}
+                    style={{ width: `${Math.min(getActiveCycle()?.progress_percentage, 100)}%` }}
                   />
                 </div>
               </>
