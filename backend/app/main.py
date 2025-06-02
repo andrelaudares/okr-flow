@@ -1,35 +1,32 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-import signal
-import sys
 from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results, reports, analytics, notifications, global_cycles
 
-# Lifecycle manager para startup/shutdown
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    print("🚀 Sistema OKR Backend iniciando...")
-    yield
-    # Shutdown
-    print("🛑 Sistema OKR Backend finalizando...")
-
+# Criar aplicação FastAPI simples e robusta
 app = FastAPI(
     title="Sistema OKR - Backend API", 
     version="1.0.0",
-    description="Backend para sistema de gestão de OKRs com autenticação hierárquica",
-    lifespan=lifespan
+    description="Backend para sistema de gestão de OKRs com autenticação hierárquica"
 )
 
-# Configurar CORS
+# Configurar CORS otimizado
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Modificado para wildcardAdd commentMore actions
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:5173", 
+        "http://localhost:8080", 
+        "http://127.0.0.1:5173", 
+        "http://127.0.0.1:8080",
+        "https://okr-flow-git-main-andrelaudares-projects.vercel.app", 
+        "https://okr-flow.vercel.app", 
+        "https://okr-flow-production.up.railway.app", 
+        "https://okr-flow-kdzrqf3ft-andrelaudares-projects.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],  # Modificado para wildcard
+    allow_headers=["Content-Type", "Authorization"],
 )
-
 
 # Incluir os roteadores com prefixos da API
 app.include_router(auth.router, prefix="/api/auth", tags=["Autenticação"])
@@ -45,69 +42,15 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["Not
 app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["Assinaturas"])
 app.include_router(global_cycles.router, prefix="/api/global-cycles", tags=["Ciclos Globais"])
 
-@app.get("/", summary="Health Check")
-async def read_root():
+@app.get("/")
+async def root():
     return {
         "status": "API está online",
         "version": "1.0.0",
         "sprint": "Sprint 9 - Sistema de Notificações e Integrações"
     }
 
-@app.get("/health", summary="Health Check Detalhado")
-async def health_check():
-    return {
-        "status": "healthy",
-        "version": "1.0.0",
-        "sprint": "Sprint 9",
-        "features": [
-            "Autenticação com Supabase",
-            "Registro de usuário owner",
-            "Gestão hierárquica de usuários",
-            "Sistema de permissões",
-            "CRUD completo de usuários",
-            "Gestão de empresas",
-            "Sistema de ciclos temporais",
-            "Cards estáticos do dashboard",
-            "CRUD completo de objetivos",
-            "Sistema de filtros e busca",
-            "CRUD completo de Key Results",
-            "Sistema de check-ins",
-            "Cálculo automático de progresso",
-            "Dashboard cards variáveis",
-            "Estatísticas em tempo real",
-            "Métricas de progresso",
-            "Contadores de objetivos",
-            "Evolução temporal",
-            "Sistema de relatórios",
-            "Exportação em múltiplos formatos",
-            "Geração em background",
-            "Download de arquivos",
-            "Sistema de histórico e analytics",
-            "Análise de tendências",
-            "Métricas de performance",
-            "Insights automáticos",
-            "Evolução temporal de objetivos",
-            "Sistema de notificações",
-            "Alertas automáticos",
-            "Configurações de notificação por usuário",
-            "Notificações de check-in pendente",
-            "Notificações de objetivo atrasado",
-            "Notificações de fim de ciclo",
-            "Notificações de meta atingida",
-            "Estatísticas de notificações",
-            "Filtros e paginação de notificações"
-        ]
-    }
-
-# Handler para shutdown graceful
-def signal_handler(signum, frame):
-    print(f"\n🛑 Recebido sinal {signum}. Finalizando servidor...")
-    sys.exit(0)
-
-# Registrar handlers de sinal
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
 # Nota: Para rodar esta aplicação, você precisará de um arquivo .env
 # com as variáveis SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY e ASAAS_API_KEY.
-# Use `uvicorn app.main:app --reload --timeout-keep-alive 30` no diretório backend/ 
+# Use `uvicorn app.main:app --reload --timeout-keep-alive 30` no diretório backend/ # Executar servidor diretamente (sem script separado)
+#
