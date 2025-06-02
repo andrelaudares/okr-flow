@@ -37,14 +37,14 @@ async def update_objective_progress(objective_id: str):
     """Atualiza o progresso do objetivo baseado nos Key Results"""
     try:
         # Buscar todos os Key Results do objetivo
-        kr_response = supabase_admin.from_('key_results').select('progress').eq('objective_id', objective_id).execute()
+        kr_response = supabase_admin().from_('key_results').select('progress').eq('objective_id', objective_id).execute()
         
         if kr_response.data:
             total_progress = sum(kr['progress'] for kr in kr_response.data)
             average_progress = total_progress / len(kr_response.data)
             
             # Atualizar progresso do objetivo
-            supabase_admin.from_('objectives').update({
+            supabase_admin().from_('objectives').update({
                 'progress': round(average_progress, 2),
                 'updated_at': 'now()'
             }).eq('id', objective_id).execute()
@@ -89,7 +89,7 @@ async def list_key_results(
             )
         
         # Verificar se objetivo existe na empresa
-        objective_check = supabase_admin.from_('objectives').select('id').eq(
+        objective_check = supabase_admin().from_('objectives').select('id').eq(
             'id', str(objective_id)
         ).eq('company_id', str(current_user.company_id)).execute()
         
@@ -110,7 +110,7 @@ async def list_key_results(
         )
         
         # Query base
-        query = supabase_admin.from_('key_results').select(
+        query = supabase_admin().from_('key_results').select(
             "*, owner:users(name), objective:objectives(title)"
         ).eq('objective_id', str(objective_id))
         
@@ -196,7 +196,7 @@ async def create_key_result(
             )
         
         # Verificar se objetivo existe na empresa
-        objective_check = supabase_admin.from_('objectives').select('id').eq(
+        objective_check = supabase_admin().from_('objectives').select('id').eq(
             'id', str(objective_id)
         ).eq('company_id', str(current_user.company_id)).execute()
         
@@ -209,7 +209,7 @@ async def create_key_result(
         # Verificar se owner_id existe na empresa (se informado)
         owner_id = kr_data.owner_id or current_user.id
         if owner_id != current_user.id:
-            owner_check = supabase_admin.from_('users').select('id').eq(
+            owner_check = supabase_admin().from_('users').select('id').eq(
                 'id', str(owner_id)
             ).eq('company_id', str(current_user.company_id)).eq('is_active', True).execute()
             
@@ -247,7 +247,7 @@ async def create_key_result(
         }
         
         # Inserir Key Result
-        insert_response = supabase_admin.from_('key_results').insert(kr_db_data).execute()
+        insert_response = supabase_admin().from_('key_results').insert(kr_db_data).execute()
         
         if not insert_response.data:
             raise HTTPException(
@@ -260,7 +260,7 @@ async def create_key_result(
         
         # Buscar dados completos do Key Result criado
         kr_id = insert_response.data[0]['id']
-        full_kr = supabase_admin.from_('key_results').select("*").eq('id', kr_id).single().execute()
+        full_kr = supabase_admin().from_('key_results').select("*").eq('id', kr_id).single().execute()
         
         if not full_kr.data:
             raise HTTPException(
@@ -313,7 +313,7 @@ async def get_key_result(
             )
         
         # Buscar Key Result com detalhes
-        response = supabase_admin.from_('key_results').select(
+        response = supabase_admin().from_('key_results').select(
             "*, owner:users(name), objective:objectives(title, company_id)"
         ).eq('id', str(kr_id)).single().execute()
         
@@ -380,7 +380,7 @@ async def update_key_result(
             )
         
         # Verificar se Key Result existe e pertence à empresa
-        existing_kr = supabase_admin.from_('key_results').select(
+        existing_kr = supabase_admin().from_('key_results').select(
             "*, objective:objectives(company_id)"
         ).eq('id', str(kr_id)).single().execute()
         
@@ -403,7 +403,7 @@ async def update_key_result(
                 if field == 'owner_id':
                     # Verificar se owner_id existe na empresa
                     if value != current_user.id:
-                        owner_check = supabase_admin.from_('users').select('id').eq(
+                        owner_check = supabase_admin().from_('users').select('id').eq(
                             'id', str(value)
                         ).eq('company_id', str(current_user.company_id)).eq('is_active', True).execute()
                         
@@ -455,7 +455,7 @@ async def update_key_result(
         update_data['updated_at'] = 'now()'
         
         # Executar atualização
-        update_response = supabase_admin.from_('key_results').update(update_data).eq('id', str(kr_id)).execute()
+        update_response = supabase_admin().from_('key_results').update(update_data).eq('id', str(kr_id)).execute()
         
         if not update_response.data:
             raise HTTPException(
@@ -467,7 +467,7 @@ async def update_key_result(
         await update_objective_progress(existing_kr.data['objective_id'])
         
         # Buscar dados atualizados
-        updated_kr = supabase_admin.from_('key_results').select("*").eq('id', str(kr_id)).single().execute()
+        updated_kr = supabase_admin().from_('key_results').select("*").eq('id', str(kr_id)).single().execute()
         
         if not updated_kr.data:
             raise HTTPException(
@@ -521,7 +521,7 @@ async def delete_key_result(
             )
         
         # Verificar se Key Result existe e pertence à empresa
-        target_kr = supabase_admin.from_('key_results').select(
+        target_kr = supabase_admin().from_('key_results').select(
             "*, objective:objectives(company_id)"
         ).eq('id', str(kr_id)).single().execute()
         
@@ -540,10 +540,10 @@ async def delete_key_result(
         objective_id = target_kr.data['objective_id']
         
         # Deletar check-ins associados primeiro
-        supabase_admin.from_('kr_checkins').delete().eq('key_result_id', str(kr_id)).execute()
+        supabase_admin().from_('kr_checkins').delete().eq('key_result_id', str(kr_id)).execute()
         
         # Deletar Key Result
-        delete_response = supabase_admin.from_('key_results').delete().eq('id', str(kr_id)).execute()
+        delete_response = supabase_admin().from_('key_results').delete().eq('id', str(kr_id)).execute()
         
         # Atualizar progresso do objetivo
         await update_objective_progress(objective_id)
@@ -577,7 +577,7 @@ async def list_checkins(
             )
         
         # Verificar se Key Result existe e pertence à empresa
-        kr_check = supabase_admin.from_('key_results').select(
+        kr_check = supabase_admin().from_('key_results').select(
             "id, objective:objectives(company_id)"
         ).eq('id', str(kr_id)).single().execute()
         
@@ -594,7 +594,7 @@ async def list_checkins(
             )
         
         # Buscar check-ins
-        response = supabase_admin.from_('kr_checkins').select(
+        response = supabase_admin().from_('kr_checkins').select(
             "*, author:users(name)"
         ).eq('key_result_id', str(kr_id)).order('checkin_date', desc=True).execute()
         
@@ -648,7 +648,7 @@ async def create_checkin(
             )
         
         # Verificar se Key Result existe e pertence à empresa
-        kr_check = supabase_admin.from_('key_results').select(
+        kr_check = supabase_admin().from_('key_results').select(
             "*, objective:objectives(company_id)"
         ).eq('id', str(kr_id)).single().execute()
         
@@ -676,7 +676,7 @@ async def create_checkin(
         }
         
         # Inserir check-in
-        insert_response = supabase_admin.from_('kr_checkins').insert(checkin_db_data).execute()
+        insert_response = supabase_admin().from_('kr_checkins').insert(checkin_db_data).execute()
         
         if not insert_response.data:
             raise HTTPException(
@@ -704,14 +704,14 @@ async def create_checkin(
         if checkin_data.confidence_level_at_checkin is not None:
             kr_update_data['confidence_level'] = checkin_data.confidence_level_at_checkin
         
-        supabase_admin.from_('key_results').update(kr_update_data).eq('id', str(kr_id)).execute()
+        supabase_admin().from_('key_results').update(kr_update_data).eq('id', str(kr_id)).execute()
         
         # Atualizar progresso do objetivo
         await update_objective_progress(kr_check.data['objective_id'])
         
         # Buscar dados completos do check-in criado
         checkin_id = insert_response.data[0]['id']
-        full_checkin = supabase_admin.from_('kr_checkins').select("*").eq('id', checkin_id).single().execute()
+        full_checkin = supabase_admin().from_('kr_checkins').select("*").eq('id', checkin_id).single().execute()
         
         if not full_checkin.data:
             raise HTTPException(
@@ -760,7 +760,7 @@ async def update_checkin(
             )
         
         # Verificar se check-in existe e pertence ao usuário
-        existing_checkin = supabase_admin.from_('kr_checkins').select(
+        existing_checkin = supabase_admin().from_('kr_checkins').select(
             "*, key_result:key_results(objective:objectives(company_id))"
         ).eq('id', str(checkin_id)).single().execute()
         
@@ -805,7 +805,7 @@ async def update_checkin(
             return Checkin(**formatted_checkin)
         
         # Executar atualização
-        update_response = supabase_admin.from_('kr_checkins').update(update_data).eq('id', str(checkin_id)).execute()
+        update_response = supabase_admin().from_('kr_checkins').update(update_data).eq('id', str(checkin_id)).execute()
         
         if not update_response.data:
             raise HTTPException(
@@ -816,7 +816,7 @@ async def update_checkin(
         # Se value_at_checkin foi atualizado, atualizar o Key Result também
         if 'value_at_checkin' in update_data:
             # Buscar dados do Key Result
-            kr_data = supabase_admin.from_('key_results').select('*').eq(
+            kr_data = supabase_admin().from_('key_results').select('*').eq(
                 'id', existing_checkin.data['key_result_id']
             ).single().execute()
             
@@ -840,7 +840,7 @@ async def update_checkin(
                 if 'confidence_level_at_checkin' in update_data:
                     kr_update_data['confidence_level'] = update_data['confidence_level_at_checkin']
                 
-                supabase_admin.from_('key_results').update(kr_update_data).eq(
+                supabase_admin().from_('key_results').update(kr_update_data).eq(
                     'id', existing_checkin.data['key_result_id']
                 ).execute()
                 
@@ -848,7 +848,7 @@ async def update_checkin(
                 await update_objective_progress(kr_data.data['objective_id'])
         
         # Buscar dados atualizados
-        updated_checkin = supabase_admin.from_('kr_checkins').select("*").eq('id', str(checkin_id)).single().execute()
+        updated_checkin = supabase_admin().from_('kr_checkins').select("*").eq('id', str(checkin_id)).single().execute()
         
         if not updated_checkin.data:
             raise HTTPException(
@@ -896,7 +896,7 @@ async def delete_checkin(
             )
         
         # Verificar se check-in existe e pertence ao usuário
-        target_checkin = supabase_admin.from_('kr_checkins').select(
+        target_checkin = supabase_admin().from_('kr_checkins').select(
             "*, key_result:key_results(objective:objectives(company_id))"
         ).eq('id', str(checkin_id)).single().execute()
         
@@ -921,7 +921,7 @@ async def delete_checkin(
             )
         
         # Deletar check-in
-        delete_response = supabase_admin.from_('kr_checkins').delete().eq('id', str(checkin_id)).execute()
+        delete_response = supabase_admin().from_('kr_checkins').delete().eq('id', str(checkin_id)).execute()
         
         return {"message": "Check-in deletado com sucesso"}
         

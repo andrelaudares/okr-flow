@@ -68,7 +68,7 @@ async def list_global_cycles(year: int = None, current_user: UserProfile = Depen
             year = datetime.now().year
         
         # Buscar ciclos globais do ano especificado
-        response = supabase_admin.from_('global_cycles').select(
+        response = supabase_admin().from_('global_cycles').select(
             "*"
         ).eq('year', year).order('start_date').execute()
         
@@ -96,7 +96,7 @@ async def get_current_cycle(current_user: UserProfile = Depends(get_current_user
         current_year = datetime.now().year
         
         # Buscar ciclo atual (is_current = true)
-        response = supabase_admin.from_('global_cycles').select(
+        response = supabase_admin().from_('global_cycles').select(
             "*"
         ).eq('year', current_year).eq('is_current', True).execute()
         
@@ -135,7 +135,7 @@ async def get_user_cycle_preference(current_user: UserProfile = Depends(get_curr
             )
         
         # Buscar preferência do usuário
-        pref_response = supabase_admin.from_('user_cycle_preferences').select(
+        pref_response = supabase_admin().from_('user_cycle_preferences').select(
             "*"
         ).eq('user_id', str(current_user.id)).eq('company_id', str(current_user.company_id)).execute()
         
@@ -144,7 +144,7 @@ async def get_user_cycle_preference(current_user: UserProfile = Depends(get_curr
             preference = pref_response.data[0]
             
             # Buscar o ciclo global correspondente
-            cycle_response = supabase_admin.from_('global_cycles').select(
+            cycle_response = supabase_admin().from_('global_cycles').select(
                 "*"
             ).eq('code', preference['global_cycle_code']).eq('year', preference['year']).execute()
             
@@ -184,7 +184,7 @@ async def update_user_cycle_preference(
         year = preference_data.year or datetime.now().year
         
         # Verificar se o ciclo global existe
-        cycle_check = supabase_admin.from_('global_cycles').select(
+        cycle_check = supabase_admin().from_('global_cycles').select(
             "id"
         ).eq('code', preference_data.global_cycle_code).eq('year', year).execute()
         
@@ -195,7 +195,7 @@ async def update_user_cycle_preference(
             )
         
         # Verificar se já existe preferência
-        existing_pref = supabase_admin.from_('user_cycle_preferences').select(
+        existing_pref = supabase_admin().from_('user_cycle_preferences').select(
             "*"
         ).eq('user_id', str(current_user.id)).eq('company_id', str(current_user.company_id)).execute()
         
@@ -207,7 +207,7 @@ async def update_user_cycle_preference(
                 'updated_at': 'now()'
             }
             
-            update_response = supabase_admin.from_('user_cycle_preferences').update(
+            update_response = supabase_admin().from_('user_cycle_preferences').update(
                 update_data
             ).eq('id', existing_pref.data[0]['id']).execute()
             
@@ -229,7 +229,7 @@ async def update_user_cycle_preference(
                 'updated_at': 'now()'
             }
             
-            create_response = supabase_admin.from_('user_cycle_preferences').insert(
+            create_response = supabase_admin().from_('user_cycle_preferences').insert(
                 create_data
             ).execute()
             
@@ -256,7 +256,7 @@ async def get_available_years(current_user: UserProfile = Depends(get_current_us
     Lista todos os anos para os quais existem ciclos globais.
     """
     try:
-        response = supabase_admin.from_('global_cycles').select(
+        response = supabase_admin().from_('global_cycles').select(
             "year"
         ).execute()
         

@@ -120,7 +120,7 @@ async def get_user_preferences(user_id: str, company_id: str) -> Optional[Dashbo
     """Busca as preferências do dashboard do usuário"""
     try:
         # Tentar buscar preferências existentes
-        prefs_response = supabase_admin.from_('dashboard_preferences').select("*").eq(
+        prefs_response = supabase_admin().from_('dashboard_preferences').select("*").eq(
             'user_id', user_id
         ).eq('company_id', company_id).execute()
         
@@ -141,7 +141,7 @@ async def get_active_cycle_status(company_id: str) -> Optional[CycleStatus]:
     try:
         from .cycles import calculate_cycle_status
         
-        response = supabase_admin.from_('cycles').select(
+        response = supabase_admin().from_('cycles').select(
             "id, name, start_date, end_date, is_active, created_at, updated_at"
         ).eq('company_id', company_id).eq('is_active', True).execute()
         
@@ -158,7 +158,7 @@ async def get_all_company_cycles(company_id: str) -> List[CycleStatus]:
     try:
         from .cycles import calculate_cycle_status
         
-        response = supabase_admin.from_('cycles').select(
+        response = supabase_admin().from_('cycles').select(
             "id, name, start_date, end_date, is_active, created_at, updated_at"
         ).eq('company_id', company_id).order('created_at', desc=True).execute()
         
@@ -179,7 +179,7 @@ async def get_global_cycle_info(cycle_code: str, cycle_year: int) -> Optional[di
     try:
         from .global_cycles import calculate_cycle_status
         
-        response = supabase_admin.from_('global_cycles').select(
+        response = supabase_admin().from_('global_cycles').select(
             "*"
         ).eq('code', cycle_code).eq('year', cycle_year).execute()
         
@@ -204,7 +204,7 @@ async def get_user_preferred_cycle_info(user_id: str, company_id: str) -> Option
         from .global_cycles import calculate_cycle_status
         
         # Buscar preferência do usuário
-        pref_response = supabase_admin.from_('user_cycle_preferences').select(
+        pref_response = supabase_admin().from_('user_cycle_preferences').select(
             "*"
         ).eq('user_id', user_id).eq('company_id', company_id).execute()
         
@@ -212,7 +212,7 @@ async def get_user_preferred_cycle_info(user_id: str, company_id: str) -> Option
             preference = pref_response.data[0]
             
             # Buscar o ciclo global correspondente
-            cycle_response = supabase_admin.from_('global_cycles').select(
+            cycle_response = supabase_admin().from_('global_cycles').select(
                 "*"
             ).eq('code', preference['global_cycle_code']).eq('year', preference['year']).execute()
             
@@ -228,7 +228,7 @@ async def get_user_preferred_cycle_info(user_id: str, company_id: str) -> Option
         
         # Se não há preferência, usar ciclo atual padrão
         current_year = datetime.now().year
-        current_response = supabase_admin.from_('global_cycles').select(
+        current_response = supabase_admin().from_('global_cycles').select(
             "*"
         ).eq('year', current_year).eq('is_current', True).execute()
         
@@ -342,7 +342,7 @@ async def update_time_preferences(
 async def get_company_data(company_id: str):
     """Busca dados básicos da empresa"""
     try:
-        response = supabase_admin.from_('companies').select('name').eq('id', company_id).single().execute()
+        response = supabase_admin().from_('companies').select('name').eq('id', company_id).single().execute()
         return response.data if response.data else None
     except Exception as e:
         print(f"DEBUG: Erro ao buscar empresa: {e}")
@@ -351,7 +351,7 @@ async def get_company_data(company_id: str):
 async def get_objectives_data(company_id: str):
     """Busca dados completos dos objetivos da empresa"""
     try:
-        response = supabase_admin.from_('objectives').select(
+        response = supabase_admin().from_('objectives').select(
             'id, title, status, progress, created_at, updated_at'
         ).eq('company_id', company_id).execute()
         return response.data if response.data else []
@@ -363,7 +363,7 @@ async def get_key_results_data(company_id: str):
     """Busca dados dos Key Results da empresa"""
     try:
         # Primeiro, buscar os IDs dos objetivos da empresa
-        objectives_response = supabase_admin.from_('objectives').select('id').eq('company_id', company_id).execute()
+        objectives_response = supabase_admin().from_('objectives').select('id').eq('company_id', company_id).execute()
         
         if not objectives_response.data:
             return []
@@ -371,7 +371,7 @@ async def get_key_results_data(company_id: str):
         objective_ids = [obj['id'] for obj in objectives_response.data]
         
         # Buscar Key Results dos objetivos
-        kr_response = supabase_admin.from_('key_results').select(
+        kr_response = supabase_admin().from_('key_results').select(
             'id, title, status, progress, objective_id'
         ).in_('objective_id', objective_ids).execute()
         
@@ -383,7 +383,7 @@ async def get_key_results_data(company_id: str):
 async def get_active_users_count(company_id: str) -> int:
     """Conta usuários ativos da empresa"""
     try:
-        response = supabase_admin.from_('users').select('id').eq(
+        response = supabase_admin().from_('users').select('id').eq(
             'company_id', company_id
         ).eq('is_active', True).execute()
         return len(response.data) if response.data else 0

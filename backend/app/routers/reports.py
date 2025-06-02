@@ -56,7 +56,7 @@ def safe_parse_datetime(date_string: str) -> datetime:
 async def get_company_data(company_id: str):
     """Busca dados da empresa"""
     try:
-        response = supabase_admin.from_('companies').select('name').eq('id', company_id).single().execute()
+        response = supabase_admin().from_('companies').select('name').eq('id', company_id).single().execute()
         return response.data if response.data else None
     except Exception as e:
         print(f"DEBUG: Erro ao buscar empresa: {e}")
@@ -66,7 +66,7 @@ async def get_single_objective_for_report(company_id: str, objective_id: str) ->
     """Busca dados detalhados de um objetivo específico para relatório"""
     try:
         # Buscar o objetivo
-        response = supabase_admin.from_('objectives').select(
+        response = supabase_admin().from_('objectives').select(
             '''
             id, title, description, owner_id, company_id, cycle_id, 
             status, progress, created_at, updated_at,
@@ -81,7 +81,7 @@ async def get_single_objective_for_report(company_id: str, objective_id: str) ->
         obj = response.data
         
         # Buscar Key Results detalhados do objetivo
-        kr_response = supabase_admin.from_('key_results').select(
+        kr_response = supabase_admin().from_('key_results').select(
             '''
             id, title, description, objective_id, owner_id, target_value,
             current_value, start_value, unit, status, progress, confidence_level,
@@ -100,7 +100,7 @@ async def get_single_objective_for_report(company_id: str, objective_id: str) ->
         formatted_key_results = []
         for kr in kr_data:
             # Buscar check-ins do Key Result
-            checkins_response = supabase_admin.from_('kr_checkins').select(
+            checkins_response = supabase_admin().from_('kr_checkins').select(
                 'id, checkin_date, value_at_checkin, notes, confidence_level_at_checkin'
             ).eq('key_result_id', kr['id']).order('checkin_date', desc=True).limit(5).execute()
             
@@ -147,7 +147,7 @@ async def get_objectives_for_report(company_id: str, filters: ReportFilters) -> 
     """Busca objetivos formatados para relatório"""
     try:
         # Query base
-        query = supabase_admin.from_('objectives').select(
+        query = supabase_admin().from_('objectives').select(
             '''
             id, title, description, owner_id, company_id, cycle_id, 
             status, progress, created_at, updated_at,
@@ -185,7 +185,7 @@ async def get_objectives_for_report(company_id: str, filters: ReportFilters) -> 
                     continue
             
             # Contar Key Results
-            kr_response = supabase_admin.from_('key_results').select(
+            kr_response = supabase_admin().from_('key_results').select(
                 'id, status'
             ).eq('objective_id', obj['id']).execute()
             
@@ -196,7 +196,7 @@ async def get_objectives_for_report(company_id: str, filters: ReportFilters) -> 
             # Incluir Key Results se solicitado
             key_results = None
             if filters.include_key_results:
-                kr_detailed = supabase_admin.from_('key_results').select(
+                kr_detailed = supabase_admin().from_('key_results').select(
                     'id, title, current_value, target_value, unit, status, progress'
                 ).eq('objective_id', obj['id']).execute()
                 key_results = kr_detailed.data if kr_detailed.data else []
@@ -230,7 +230,7 @@ async def get_key_results_for_report(company_id: str, filters: ReportFilters) ->
             objective_ids = [filters.objective_id]
         else:
             # Primeiro, buscar objetivos da empresa
-            objectives_response = supabase_admin.from_('objectives').select('id').eq('company_id', company_id).execute()
+            objectives_response = supabase_admin().from_('objectives').select('id').eq('company_id', company_id).execute()
             
             if not objectives_response.data:
                 return []
@@ -238,7 +238,7 @@ async def get_key_results_for_report(company_id: str, filters: ReportFilters) ->
             objective_ids = [obj['id'] for obj in objectives_response.data]
         
         # Buscar Key Results
-        query = supabase_admin.from_('key_results').select(
+        query = supabase_admin().from_('key_results').select(
             '''
             id, title, description, objective_id, owner_id, target_value,
             current_value, start_value, unit, status, progress, confidence_level,
@@ -270,7 +270,7 @@ async def get_key_results_for_report(company_id: str, filters: ReportFilters) ->
                     continue
             
             # Contar check-ins e buscar último
-            checkins_response = supabase_admin.from_('kr_checkins').select(
+            checkins_response = supabase_admin().from_('kr_checkins').select(
                 'id, checkin_date'
             ).eq('key_result_id', kr['id']).order('checkin_date', desc=True).execute()
             
@@ -317,13 +317,13 @@ async def get_dashboard_data_for_report(company_id: str) -> DashboardReportData:
         key_results_data = await get_key_results_for_report(company_id, ReportFilters())
         
         # Contar usuários ativos
-        users_response = supabase_admin.from_('users').select('id').eq(
+        users_response = supabase_admin().from_('users').select('id').eq(
             'company_id', company_id
         ).eq('is_active', True).execute()
         active_users = len(users_response.data) if users_response.data else 0
         
         # Buscar ciclo ativo
-        cycle_response = supabase_admin.from_('cycles').select(
+        cycle_response = supabase_admin().from_('cycles').select(
             'name'
         ).eq('company_id', company_id).eq('is_active', True).execute()
         

@@ -21,7 +21,7 @@ async def get_company_profile(current_user: UserProfile = Depends(get_current_us
             )
         
         # Buscar dados da empresa
-        company_response = supabase_admin.from_('companies').select("*").eq('id', str(current_user.company_id)).single().execute()
+        company_response = supabase_admin().from_('companies').select("*").eq('id', str(current_user.company_id)).single().execute()
         
         if not company_response.data:
             raise HTTPException(
@@ -32,7 +32,7 @@ async def get_company_profile(current_user: UserProfile = Depends(get_current_us
         company_data = company_response.data
         
         # Buscar estatísticas dos usuários
-        users_stats_response = supabase_admin.from_('users').select(
+        users_stats_response = supabase_admin().from_('users').select(
             "id, is_active, is_owner, name"
         ).eq('company_id', str(current_user.company_id)).execute()
         
@@ -95,7 +95,7 @@ async def update_company_profile(
             )
         
         # Verificar se empresa existe
-        existing_company = supabase_admin.from_('companies').select("*").eq('id', str(current_user.company_id)).single().execute()
+        existing_company = supabase_admin().from_('companies').select("*").eq('id', str(current_user.company_id)).single().execute()
         
         if not existing_company.data:
             raise HTTPException(
@@ -117,7 +117,7 @@ async def update_company_profile(
         update_data['updated_at'] = 'now()'
         
         # Executar atualização
-        update_response = supabase_admin.from_('companies').update(update_data).eq('id', str(current_user.company_id)).execute()
+        update_response = supabase_admin().from_('companies').update(update_data).eq('id', str(current_user.company_id)).execute()
         
         if not update_response.data:
             raise HTTPException(
@@ -165,7 +165,7 @@ async def update_company_deprecated(
             )
         
         # Verificar se empresa existe
-        existing_company = supabase_admin.from_('companies').select("*").eq('id', str(company_id)).single().execute()
+        existing_company = supabase_admin().from_('companies').select("*").eq('id', str(company_id)).single().execute()
         
         if not existing_company.data:
             raise HTTPException(
@@ -187,7 +187,7 @@ async def update_company_deprecated(
         update_data['updated_at'] = 'now()'
         
         # Executar atualização
-        update_response = supabase_admin.from_('companies').update(update_data).eq('id', str(company_id)).execute()
+        update_response = supabase_admin().from_('companies').update(update_data).eq('id', str(company_id)).execute()
         
         if not update_response.data:
             raise HTTPException(
@@ -196,7 +196,7 @@ async def update_company_deprecated(
             )
         
         # Buscar dados atualizados
-        updated_company = supabase_admin.from_('companies').select("*").eq('id', str(company_id)).single().execute()
+        updated_company = supabase_admin().from_('companies').select("*").eq('id', str(company_id)).single().execute()
         
         if not updated_company.data:
             raise HTTPException(

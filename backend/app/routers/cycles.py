@@ -69,7 +69,7 @@ async def list_cycles(current_user: UserProfile = Depends(get_current_user)):
             )
         
         # Buscar ciclos da empresa
-        response = supabase_admin.from_('cycles').select(
+        response = supabase_admin().from_('cycles').select(
             "id, name, start_date, end_date, is_active, created_at, updated_at"
         ).eq('company_id', str(current_user.company_id)).order('start_date', desc=True).execute()
         
@@ -111,7 +111,7 @@ async def create_cycle(cycle_data: CycleCreate, current_user: UserProfile = Depe
             )
         
         # Verificar se já existe um ciclo com o mesmo nome na empresa
-        existing_cycle = supabase_admin.from_('cycles').select("id").eq(
+        existing_cycle = supabase_admin().from_('cycles').select("id").eq(
             'company_id', str(current_user.company_id)
         ).eq('name', cycle_data.name).execute()
         
@@ -133,7 +133,7 @@ async def create_cycle(cycle_data: CycleCreate, current_user: UserProfile = Depe
         }
         
         # Inserir ciclo
-        insert_response = supabase_admin.from_('cycles').insert(cycle_db_data).execute()
+        insert_response = supabase_admin().from_('cycles').insert(cycle_db_data).execute()
         
         if not insert_response.data:
             raise HTTPException(
@@ -143,7 +143,7 @@ async def create_cycle(cycle_data: CycleCreate, current_user: UserProfile = Depe
         
         # Buscar dados completos do ciclo criado
         cycle_id = insert_response.data[0]['id']
-        full_cycle = supabase_admin.from_('cycles').select("*").eq('id', cycle_id).single().execute()
+        full_cycle = supabase_admin().from_('cycles').select("*").eq('id', cycle_id).single().execute()
         
         if not full_cycle.data:
             raise HTTPException(
@@ -176,7 +176,7 @@ async def get_active_cycle(current_user: UserProfile = Depends(get_current_user)
             )
         
         # Primeiro, tentar buscar ciclo ativo personalizado (legado)
-        response = supabase_admin.from_('cycles').select(
+        response = supabase_admin().from_('cycles').select(
             "id, name, start_date, end_date, is_active, created_at, updated_at"
         ).eq('company_id', str(current_user.company_id)).eq('is_active', True).execute()
         
@@ -189,7 +189,7 @@ async def get_active_cycle(current_user: UserProfile = Depends(get_current_user)
         # Se não há ciclo ativo personalizado, tentar usar preferência global do usuário
         try:
             # Buscar preferência do usuário
-            pref_response = supabase_admin.from_('user_cycle_preferences').select(
+            pref_response = supabase_admin().from_('user_cycle_preferences').select(
                 "*"
             ).eq('user_id', str(current_user.id)).eq('company_id', str(current_user.company_id)).execute()
             
@@ -197,7 +197,7 @@ async def get_active_cycle(current_user: UserProfile = Depends(get_current_user)
                 preference = pref_response.data[0]
                 
                 # Buscar o ciclo global correspondente
-                global_cycle_response = supabase_admin.from_('global_cycles').select(
+                global_cycle_response = supabase_admin().from_('global_cycles').select(
                     "*"
                 ).eq('code', preference['global_cycle_code']).eq('year', preference['year']).execute()
                 
@@ -216,7 +216,7 @@ async def get_active_cycle(current_user: UserProfile = Depends(get_current_user)
             
             # Se não há preferência, usar ciclo atual baseado na data
             current_year = datetime.now().year
-            current_global = supabase_admin.from_('global_cycles').select(
+            current_global = supabase_admin().from_('global_cycles').select(
                 "*"
             ).eq('year', current_year).eq('is_current', True).execute()
             
@@ -275,7 +275,7 @@ async def update_cycle(
             )
         
         # Verificar se ciclo existe na empresa
-        existing_cycle = supabase_admin.from_('cycles').select("*").eq(
+        existing_cycle = supabase_admin().from_('cycles').select("*").eq(
             'id', str(cycle_id)
         ).eq('company_id', str(current_user.company_id)).single().execute()
         
@@ -300,7 +300,7 @@ async def update_cycle(
         
         # Verificar nome único se estiver sendo atualizado
         if 'name' in update_data:
-            name_check = supabase_admin.from_('cycles').select("id").eq(
+            name_check = supabase_admin().from_('cycles').select("id").eq(
                 'company_id', str(current_user.company_id)
             ).eq('name', update_data['name']).neq('id', str(cycle_id)).execute()
             
@@ -314,7 +314,7 @@ async def update_cycle(
         update_data['updated_at'] = 'now()'
         
         # Executar atualização
-        update_response = supabase_admin.from_('cycles').update(update_data).eq('id', str(cycle_id)).execute()
+        update_response = supabase_admin().from_('cycles').update(update_data).eq('id', str(cycle_id)).execute()
         
         if not update_response.data:
             raise HTTPException(
@@ -323,7 +323,7 @@ async def update_cycle(
             )
         
         # Buscar dados atualizados
-        updated_cycle = supabase_admin.from_('cycles').select("*").eq('id', str(cycle_id)).single().execute()
+        updated_cycle = supabase_admin().from_('cycles').select("*").eq('id', str(cycle_id)).single().execute()
         
         if not updated_cycle.data:
             raise HTTPException(
@@ -364,7 +364,7 @@ async def delete_cycle(cycle_id: UUID, current_user: UserProfile = Depends(get_c
             )
         
         # Verificar se ciclo existe na empresa
-        target_cycle = supabase_admin.from_('cycles').select("*").eq(
+        target_cycle = supabase_admin().from_('cycles').select("*").eq(
             'id', str(cycle_id)
         ).eq('company_id', str(current_user.company_id)).single().execute()
         
@@ -382,7 +382,7 @@ async def delete_cycle(cycle_id: UUID, current_user: UserProfile = Depends(get_c
             )
         
         # Deletar ciclo
-        delete_response = supabase_admin.from_('cycles').delete().eq('id', str(cycle_id)).execute()
+        delete_response = supabase_admin().from_('cycles').delete().eq('id', str(cycle_id)).execute()
         
         return {"message": "Ciclo deletado com sucesso"}
         
@@ -416,7 +416,7 @@ async def activate_cycle(cycle_id: UUID, current_user: UserProfile = Depends(get
             )
         
         # Verificar se ciclo existe na empresa
-        target_cycle = supabase_admin.from_('cycles').select("*").eq(
+        target_cycle = supabase_admin().from_('cycles').select("*").eq(
             'id', str(cycle_id)
         ).eq('company_id', str(current_user.company_id)).single().execute()
         
@@ -427,13 +427,13 @@ async def activate_cycle(cycle_id: UUID, current_user: UserProfile = Depends(get
             )
         
         # Desativar todos os ciclos da empresa
-        supabase_admin.from_('cycles').update({
+        supabase_admin().from_('cycles').update({
             'is_active': False,
             'updated_at': 'now()'
         }).eq('company_id', str(current_user.company_id)).execute()
         
         # Ativar o ciclo especificado
-        activate_response = supabase_admin.from_('cycles').update({
+        activate_response = supabase_admin().from_('cycles').update({
             'is_active': True,
             'updated_at': 'now()'
         }).eq('id', str(cycle_id)).execute()
@@ -445,7 +445,7 @@ async def activate_cycle(cycle_id: UUID, current_user: UserProfile = Depends(get
             )
         
         # Buscar dados atualizados do ciclo
-        updated_cycle = supabase_admin.from_('cycles').select("*").eq('id', str(cycle_id)).single().execute()
+        updated_cycle = supabase_admin().from_('cycles').select("*").eq('id', str(cycle_id)).single().execute()
         
         if not updated_cycle.data:
             raise HTTPException(

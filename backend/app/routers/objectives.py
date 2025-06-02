@@ -16,7 +16,7 @@ router = APIRouter()
 async def get_active_cycle_id(company_id: str) -> Optional[str]:
     """Busca o ID do ciclo ativo da empresa"""
     try:
-        response = supabase_admin.from_('cycles').select('id').eq(
+        response = supabase_admin().from_('cycles').select('id').eq(
             'company_id', company_id
         ).eq('is_active', True).execute()
         
@@ -39,7 +39,7 @@ def apply_status_filter(query, statuses: List[ObjectiveStatus]):
 async def get_key_results_count(objective_id: str) -> int:
     """Busca a quantidade de Key Results do objetivo"""
     try:
-        response = supabase_admin.from_('key_results').select('id').eq('objective_id', objective_id).execute()
+        response = supabase_admin().from_('key_results').select('id').eq('objective_id', objective_id).execute()
         return len(response.data) if response.data else 0
     except Exception as e:
         print(f"DEBUG: Erro ao buscar contagem de Key Results: {e}")
@@ -77,7 +77,7 @@ async def list_objectives(
         )
         
         # Query base
-        query = supabase_admin.from_('objectives').select(
+        query = supabase_admin().from_('objectives').select(
             "*, owner:users(name), cycle:cycles(name)"
         ).eq('company_id', str(current_user.company_id))
         
@@ -168,7 +168,7 @@ async def create_objective(
             cycle_id = active_cycle_id  # Pode ser None se não houver ciclo ativo
         else:
             # Verificar se o ciclo pertence à empresa
-            cycle_check = supabase_admin.from_('cycles').select('id').eq(
+            cycle_check = supabase_admin().from_('cycles').select('id').eq(
                 'id', str(cycle_id)
             ).eq('company_id', str(current_user.company_id)).execute()
             
@@ -181,7 +181,7 @@ async def create_objective(
         # Verificar se owner_id existe na empresa (se informado)
         owner_id = objective_data.owner_id or current_user.id
         if owner_id != current_user.id:
-            owner_check = supabase_admin.from_('users').select('id').eq(
+            owner_check = supabase_admin().from_('users').select('id').eq(
                 'id', str(owner_id)
             ).eq('company_id', str(current_user.company_id)).eq('is_active', True).execute()
             
@@ -208,7 +208,7 @@ async def create_objective(
             objective_db_data['cycle_id'] = str(cycle_id)
         
         # Inserir objetivo
-        insert_response = supabase_admin.from_('objectives').insert(objective_db_data).execute()
+        insert_response = supabase_admin().from_('objectives').insert(objective_db_data).execute()
         
         if not insert_response.data:
             raise HTTPException(
@@ -218,7 +218,7 @@ async def create_objective(
         
         # Buscar dados completos do objetivo criado
         objective_id = insert_response.data[0]['id']
-        full_objective = supabase_admin.from_('objectives').select("*").eq('id', objective_id).single().execute()
+        full_objective = supabase_admin().from_('objectives').select("*").eq('id', objective_id).single().execute()
         
         if not full_objective.data:
             raise HTTPException(
@@ -253,7 +253,7 @@ async def get_objective(
             )
         
         # Buscar objetivo com detalhes
-        response = supabase_admin.from_('objectives').select(
+        response = supabase_admin().from_('objectives').select(
             "*, owner:users(name), cycle:cycles(name)"
         ).eq('id', str(objective_id)).eq('company_id', str(current_user.company_id)).single().execute()
         
@@ -311,7 +311,7 @@ async def update_objective(
             )
         
         # Verificar se objetivo existe na empresa
-        existing_objective = supabase_admin.from_('objectives').select("*").eq(
+        existing_objective = supabase_admin().from_('objectives').select("*").eq(
             'id', str(objective_id)
         ).eq('company_id', str(current_user.company_id)).single().execute()
         
@@ -328,7 +328,7 @@ async def update_objective(
                 if field == 'owner_id':
                     # Verificar se owner_id existe na empresa
                     if value != current_user.id:
-                        owner_check = supabase_admin.from_('users').select('id').eq(
+                        owner_check = supabase_admin().from_('users').select('id').eq(
                             'id', str(value)
                         ).eq('company_id', str(current_user.company_id)).eq('is_active', True).execute()
                         
@@ -351,7 +351,7 @@ async def update_objective(
         update_data['updated_at'] = 'now()'
         
         # Executar atualização
-        update_response = supabase_admin.from_('objectives').update(update_data).eq('id', str(objective_id)).execute()
+        update_response = supabase_admin().from_('objectives').update(update_data).eq('id', str(objective_id)).execute()
         
         if not update_response.data:
             raise HTTPException(
@@ -360,7 +360,7 @@ async def update_objective(
             )
         
         # Buscar dados atualizados
-        updated_objective = supabase_admin.from_('objectives').select("*").eq('id', str(objective_id)).single().execute()
+        updated_objective = supabase_admin().from_('objectives').select("*").eq('id', str(objective_id)).single().execute()
         
         if not updated_objective.data:
             raise HTTPException(
@@ -403,7 +403,7 @@ async def delete_objective(
             )
         
         # Verificar se objetivo existe na empresa
-        target_objective = supabase_admin.from_('objectives').select("*").eq(
+        target_objective = supabase_admin().from_('objectives').select("*").eq(
             'id', str(objective_id)
         ).eq('company_id', str(current_user.company_id)).single().execute()
         
@@ -414,7 +414,7 @@ async def delete_objective(
             )
         
         # Verificar se tem key results associados
-        kr_count = supabase_admin.from_('key_results').select('id').eq('objective_id', str(objective_id)).execute()
+        kr_count = supabase_admin().from_('key_results').select('id').eq('objective_id', str(objective_id)).execute()
         
         if kr_count.data:
             raise HTTPException(
@@ -423,7 +423,7 @@ async def delete_objective(
             )
         
         # Deletar objetivo
-        delete_response = supabase_admin.from_('objectives').delete().eq('id', str(objective_id)).execute()
+        delete_response = supabase_admin().from_('objectives').delete().eq('id', str(objective_id)).execute()
         
         return {"message": "Objetivo deletado com sucesso"}
         
@@ -449,7 +449,7 @@ async def get_objectives_stats(current_user: UserProfile = Depends(get_current_u
             )
         
         # Buscar todos os objetivos da empresa
-        response = supabase_admin.from_('objectives').select('status, progress').eq(
+        response = supabase_admin().from_('objectives').select('status, progress').eq(
             'company_id', str(current_user.company_id)
         ).execute()
         
