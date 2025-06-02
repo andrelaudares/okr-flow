@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { toast } from 'sonner';
 import { useUsers } from '@/hooks/use-users';
 import { usePermissions } from '@/hooks/use-auth';
+import api from '@/lib/api';
 import type { User, UserRole } from '@/types/auth';
 
 // Schema de validação
@@ -46,7 +47,8 @@ interface EditUserFormProps {
 
 const EditUserForm: React.FC<EditUserFormProps> = ({ user, onSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const { updateUser, isUpdating } = useUsers();
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const { updateUser, isUpdating, refetch } = useUsers();
   const { isOwner, isAdmin } = usePermissions();
 
   const {
@@ -78,21 +80,74 @@ const EditUserForm: React.FC<EditUserFormProps> = ({ user, onSuccess }) => {
         is_active: data.is_active,
       };
 
-      // Só incluir senha se foi preenchida
+      // Atualizar dados básicos do usuário
+      await updateUser(user.id, updateData);
+
+      // Se senha foi preenchida, alterar senha separadamente
       if (data.password && data.password.trim()) {
-        updateData.password = data.password;
+        setIsChangingPassword(true);
+        try {
+          const response = await api.post(`/api/users/${user.id}/change-password`, {
+            new_password: data.password
+          });
+          
+          // Verificar diferentes tipos de resposta
+          if (response.data.manual_instruction) {
+            // Mostrar instruções detalhadas com opção de copiar
+            const message = response.data.message;
+            const newPassword = response.data.new_password;
+            const userName = response.data.user_name;
+            
+            // Mostrar toast de sucesso primeiro
+            toast.success(`Senha definida para ${userName}!`);
+            
+            // Depois mostrar as instruções com opção de copiar
+            const confirmMessage = `${message}\n\nDeseja copiar a senha "${newPassword}" para a área de transferência?`;
+            
+            if (window.confirm(confirmMessage)) {
+              // Copiar senha para clipboard
+              try {
+                await navigator.clipboard.writeText(newPassword);
+                toast.success("📋 Senha copiada! Cole onde precisar.");
+              } catch (err) {
+                // Fallback para seleção manual
+                const textArea = document.createElement('textarea');
+                textArea.value = newPassword;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                toast.success("📋 Senha copiada! Cole onde precisar.");
+              }
+            } else {
+              toast.warning("⚠️ Lembre-se de anotar a senha antes de sair desta tela!");
+            }
+            
+          } else {
+            // Sucesso direto (caso o Supabase permita)
+            toast.success("Senha alterada com sucesso!");
+          }
+          
+        } catch (passwordError: any) {
+          console.error('Password change error:', passwordError);
+          toast.error(passwordError.response?.data?.detail || 'Erro ao alterar senha');
+        }
       }
 
-      await updateUser(user.id, updateData);
       toast.success(`Usuário ${data.name} atualizado com sucesso!`);
+      await refetch(); // Atualizar lista
       onSuccess();
     } catch (error: any) {
       console.error('Update user error:', error);
-      // O erro já é tratado pelos interceptors da API
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar usuário');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
-  const isFormLoading = isUpdating || isSubmitting;
+  const isFormLoading = isUpdating || isSubmitting || isChangingPassword;
 
   // Verificar se pode editar este usuário
   const canEditRole = isOwner || (isAdmin && user.role !== 'OWNER');

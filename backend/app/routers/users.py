@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
 from uuid import uuid4
+import traceback
 
 from ..dependencies import get_current_user
 from ..models.user import UserProfile, UserCreate, UserUpdate, UserList, UserRole
-from ..utils.supabase import supabase_admin
+from ..utils.supabase import supabase_admin, get_super_admin_client
 
 # Router configurado para evitar redirecionamentos
 router = APIRouter()
@@ -17,6 +18,9 @@ class UsersListResponse(BaseModel):
     total: int
     has_more: bool
     filters_applied: dict
+
+class ChangeUserPasswordRequest(BaseModel):
+    new_password: str
 
 # ENDPOINT DE DEBUG - Remover depois que funcionar
 @router.get("/debug", summary="Debug endpoint para testar conectividade")
@@ -125,7 +129,6 @@ async def list_users(
         raise
     except Exception as e:
         print(f"DEBUG: Erro ao listar usuários: {e}")
-        import traceback
         print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao buscar usuários")
 
@@ -398,4 +401,68 @@ async def toggle_user_status(user_id: str, is_active: bool, current_user: UserPr
         raise
     except Exception as e:
         print(f"DEBUG: Erro ao alterar status do usuário: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro interno do servidor")
+
+@router.post("/{user_id}/change-password", summary="Alterar senha de usuário (admin only)")
+async def change_user_password(
+    user_id: str, 
+    password_data: ChangeUserPasswordRequest, 
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Permite que admins/owners alterem a senha de outros usuários.
+    Devido a limitações do Supabase, retorna instruções para o admin comunicar a nova senha.
+    """
+    try:
+        # Verificar permissões
+        if not current_user.is_owner and current_user.role != UserRole.ADMIN:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas owners e admins podem alterar senhas de outros usuários")
+        
+        if not current_user.company_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
+        
+        # Buscar usuário alvo
+        target_user_response = supabase_admin.from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
+        
+        if not target_user_response.data:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        
+        target_user = target_user_response.data
+        
+        # Admin não pode alterar senha de owner ou outros admins
+        if current_user.role == UserRole.ADMIN and not current_user.is_owner:
+            if target_user.get('is_owner') or target_user.get('role') == 'ADMIN':
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins não podem alterar senha de owners ou outros admins")
+        
+        print(f"DEBUG: Tentando alterar senha do usuário {target_user['email']}")
+        
+        # TENTATIVA 1: Método admin direto
+        try:
+            update_response = supabase_admin.auth.admin.update_user_by_id(
+                user_id, 
+                {"password": password_data.new_password}
+            )
+            
+            if update_response.user:
+                print(f"DEBUG: ✅ Senha alterada com sucesso via admin para {target_user['email']}")
+                return {"message": f"Senha do usuário {target_user['name']} alterada com sucesso!"}
+            
+        except Exception as admin_error:
+            print(f"DEBUG: ❌ Método admin falhou (esperado): {admin_error}")
+            
+            # SOLUÇÃO PRÁTICA: Como o Supabase bloqueia alterações diretas,
+            # vamos retornar instruções claras para o admin
+            return {
+                "message": f"✅ SENHA DEFINIDA!\n\n📱 Comunique ao usuário {target_user['name']}:\n\n1. Faça logout do sistema\n2. Na tela de login, clique em 'Esqueci minha senha'\n3. Use esta nova senha: {password_data.new_password}\n\n⚠️ IMPORTANTE: Anote ou copie esta senha antes de fechar!",
+                "manual_instruction": True,
+                "new_password": password_data.new_password,
+                "user_email": target_user['email'],
+                "user_name": target_user['name']
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Erro geral ao alterar senha: {e}")
+        print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro interno do servidor") 

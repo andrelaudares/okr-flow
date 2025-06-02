@@ -20,6 +20,7 @@ const registerSchema = z.object({
     .string()
     .min(1, "Email é obrigatório")
     .email("Email inválido"),
+
   password: z
     .string()
     .min(1, "Senha é obrigatória")
@@ -66,15 +67,26 @@ const RegisterForm = () => {
 
   const onSubmit = async (data: RegisterFormData) => {
       try {
-      await registerUser({
+      console.log('🔍 Dados do formulário:', data);
+      
+      // Gerar username automaticamente baseado no email
+      const username = data.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      
+      const registerData = {
         name: data.name,
         email: data.email,
+        username: username, // Gerar automaticamente
         password: data.password,
         cpf_cnpj: data.cpf_cnpj,
-      });
+      };
+      
+      console.log('🔍 Enviando para o backend:', registerData);
+      
+      await registerUser(registerData);
       // O redirecionamento é feito automaticamente pelo hook useAuth
     } catch (error: any) {
-      console.error("Register error:", error);
+      console.error("❌ Register error:", error);
+      console.error("❌ Error response:", error.response?.data);
       // O erro já é tratado pelos interceptors da API
       // Mas vamos garantir uma mensagem amigável
       if (error.message) {
@@ -129,6 +141,8 @@ const RegisterForm = () => {
               <p className="text-sm text-red-500">{errors.email.message}</p>
             )}
           </div>
+
+          
 
           <div className="space-y-2">
             <label htmlFor="cpf_cnpj" className="text-sm font-medium">

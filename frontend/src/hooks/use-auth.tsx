@@ -149,20 +149,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       setIsLoading(true);
       
+      console.log('🚀 Iniciando registro no hook useAuth:', data);
+      
       const response = await api.post('/api/auth/register', data);
-      const authData: AuthResponse = response.data;
       
-      setTokens(authData.access_token, authData.refresh_token);
+      console.log('✅ Resposta do backend:', response);
+      console.log('✅ Data da resposta:', response.data);
       
-      setToken(authData.access_token);
-      setUser(authData.user);
-      setSessionExpiresAt(authData.user.expires_at);
+      const registerData = response.data;
       
-      localStorage.setItem('nobugOkrUser', JSON.stringify(authData.user));
+      // O endpoint de registro não retorna tokens, apenas confirma o registro
+      toast.success(registerData.message || 'Conta criada com sucesso! Faça login para continuar.');
       
-      toast.success(`Conta criada com sucesso! Bem-vindo, ${authData.user.name}!`);
-      navigate('/dashboard');
+      // Redirecionar para login após o registro bem-sucedido
+      navigate('/login');
     } catch (error: any) {
+      console.error('❌ Erro no hook useAuth:', error);
+      console.error('❌ Response error:', error.response);
+      console.error('❌ Response data:', error.response?.data);
+      
       const errorMessage = error.response?.data?.detail || 'Erro ao criar conta';
       toast.error(errorMessage);
       throw error;

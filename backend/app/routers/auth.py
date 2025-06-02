@@ -29,6 +29,10 @@ class UpdatePasswordRequest(BaseModel):
     refresh_token: str
     new_password: str
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -545,6 +549,66 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
     except Exception as e:
         print(f"DEBUG: Erro ao atualizar senha: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha. Tokens podem estar inválidos ou expirados.")
+
+@router.post("/change-password", summary="Alterar senha de usuário logado")
+async def change_password(password_data: ChangePasswordRequest, current_user: UserProfile = Depends(get_current_user)):
+    """
+    Permite que usuário logado altere sua própria senha.
+    Requer a senha atual para confirmar identidade.
+    """
+    check_supabase_config()
+    
+    try:
+        # Verificar senha atual fazendo login
+        try:
+            login_response = supabase_client.auth.sign_in_with_password({
+                "email": current_user.email,
+                "password": password_data.current_password
+            })
+            
+            if not login_response.user:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Senha atual incorreta")
+            
+        except Exception as e:
+            print(f"DEBUG: Erro ao verificar senha atual: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Senha atual incorreta")
+        
+        # Atualizar senha usando o token da sessão atual
+        try:
+            # Usar o cliente autenticado para atualizar a senha
+            update_response = supabase_client.auth.update_user({
+                "password": password_data.new_password
+            })
+            
+            if not update_response.user:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao atualizar senha")
+            
+        except Exception as e:
+            print(f"DEBUG: Erro ao atualizar senha via cliente: {e}")
+            # Tentar via admin como fallback
+            try:
+                update_response = supabase_admin.auth.admin.update_user_by_id(
+                    str(current_user.id),
+                    {"password": password_data.new_password}
+                )
+                
+                if not update_response.user:
+                    raise Exception("Admin update failed")
+                    
+            except Exception as admin_error:
+                print(f"DEBUG: Admin update também falhou: {admin_error}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao atualizar senha. Tente novamente mais tarde.")
+        
+        print(f"DEBUG: Senha alterada com sucesso para usuário: {current_user.email}")
+        
+        return {"message": "Senha alterada com sucesso"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DEBUG: Erro ao alterar senha: {e}")
+        print(f"DEBUG: Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao alterar senha")
 
 # 🔒 NOVOS ENDPOINTS PARA GERENCIAMENTO DE SESSÕES
 
