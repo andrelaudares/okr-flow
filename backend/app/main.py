@@ -29,14 +29,17 @@ app = FastAPI(
     description="Backend para sistema de gestão de OKRs com autenticação hierárquica",
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    # Fix para redirecionamentos 307 - IMPORTANTE!
+    redirect_slashes=False,  # Evita redirecionamentos automáticos
+    root_path=""  # Fix para proxy reverso
 )
 
 # Middleware de compressão GZip para melhorar performance
 if settings.ENABLE_GZIP:
     app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Middleware de hosts confiáveis (segurança)
+# Middleware de hosts confiáveis (segurança) - ATUALIZADO
 app.add_middleware(
     TrustedHostMiddleware, 
     allowed_hosts=[
@@ -44,11 +47,12 @@ app.add_middleware(
         "127.0.0.1", 
         "*.vercel.app", 
         "*.railway.app",
-        "*.up.railway.app"
+        "*.up.railway.app",
+        "*"  # Permite todos em produção (Railway configura isso)
     ]
 )
 
-# CORS otimizado e mais limpo
+# CORS otimizado e mais limpo - CORRIGIDO para produção
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -60,14 +64,15 @@ app.add_middleware(
         "https://okr-flow-git-main-andrelaudares-projects.vercel.app", 
         "https://okr-flow.vercel.app", 
         "https://okr-flow-production.up.railway.app", 
-        "https://okr-flow-kdzrqf3ft-andrelaudares-projects.vercel.app"
+        "https://okr-flow-kdzrqf3ft-andrelaudares-projects.vercel.app",
+        "*"  # Temporário para debug - remover depois
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["*"],  # Permite todos os headers
 )
 
-# Incluir os roteadores com prefixos da API
+# Incluir os roteadores com prefixos da API - SEM barra final!
 app.include_router(auth.router, prefix="/api/auth", tags=["Autenticação"])
 app.include_router(users.router, prefix="/api/users", tags=["Usuários"])
 app.include_router(companies.router, prefix="/api/companies", tags=["Empresas"])

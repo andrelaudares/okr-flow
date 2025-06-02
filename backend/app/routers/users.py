@@ -6,6 +6,7 @@ from ..dependencies import get_current_user
 from ..models.user import UserProfile, UserCreate, UserUpdate, UserList, UserRole
 from ..utils.supabase import supabase_admin
 
+# Router configurado para evitar redirecionamentos
 router = APIRouter()
 
 # Modelo para resposta da listagem de usuários  
@@ -17,6 +18,35 @@ class UsersListResponse(BaseModel):
     has_more: bool
     filters_applied: dict
 
+# ENDPOINT DE DEBUG - Remover depois que funcionar
+@router.get("/debug", summary="Debug endpoint para testar conectividade")
+async def debug_users(current_user: UserProfile = Depends(get_current_user)):
+    """
+    Endpoint de debug para verificar se a autenticação e conexão estão funcionando.
+    """
+    try:
+        print(f"DEBUG: Usuário autenticado: {current_user.name} (ID: {current_user.id})")
+        print(f"DEBUG: Company ID: {current_user.company_id}")
+        print(f"DEBUG: Role: {current_user.role}")
+        
+        # Teste simples de query
+        test_query = supabase_admin.from_('users').select('id, name, email').eq('company_id', str(current_user.company_id)).limit(1).execute()
+        
+        return {
+            "status": "OK",
+            "user": {
+                "id": current_user.id,
+                "name": current_user.name,
+                "company_id": current_user.company_id,
+                "role": current_user.role
+            },
+            "test_query_result": len(test_query.data) if test_query.data else 0,
+            "message": "Endpoint de debug funcionando"
+        }
+    except Exception as e:
+        print(f"DEBUG ERROR: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Debug error: {str(e)}")
+
 @router.get("/me", response_model=UserProfile, summary="Retorna os dados do usuário logado")
 async def read_users_me(current_user: UserProfile = Depends(get_current_user)):
     """
@@ -24,7 +54,8 @@ async def read_users_me(current_user: UserProfile = Depends(get_current_user)):
     """
     return current_user
 
-@router.get("/", response_model=UsersListResponse, summary="Lista usuários da empresa")
+# CORRIGIDO: Especificar exatamente a rota sem ambiguidade
+@router.get("", response_model=UsersListResponse, summary="Lista usuários da empresa")
 async def list_users(
     current_user: UserProfile = Depends(get_current_user),
     search: Optional[str] = Query(None, description="Buscar por nome ou email"),
@@ -39,6 +70,8 @@ async def list_users(
     Retorna lista paginada com metadados.
     """
     try:
+        print(f"DEBUG: Listando usuários para empresa {current_user.company_id}")
+        
         if not current_user.company_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
@@ -70,6 +103,8 @@ async def list_users(
         users_data = response.data or []
         total_count = response.count or 0
         
+        print(f"DEBUG: Encontrados {len(users_data)} usuários de {total_count} total")
+        
         users_list = [UserList(**user) for user in users_data]
         has_more = offset + len(users_data) < total_count
         
@@ -86,11 +121,30 @@ async def list_users(
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"DEBUG: Erro ao listar usuários: {e}")
+        import traceback
+        print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao buscar usuários")
 
-@router.post("/", response_model=UserProfile, summary="Criar novo usuário (apenas owner/admin)")
+# ADICIONADO: Rota adicional com barra para compatibilidade
+@router.get("/", response_model=UsersListResponse, summary="Lista usuários da empresa (com barra)")
+async def list_users_with_slash(
+    current_user: UserProfile = Depends(get_current_user),
+    search: Optional[str] = Query(None, description="Buscar por nome ou email"),
+    role: Optional[str] = Query(None, description="Filtrar por role"),
+    is_active: Optional[bool] = Query(None, description="Filtrar por status ativo"),
+    limit: int = Query(10, ge=1, le=100, description="Limite de resultados"),
+    offset: int = Query(0, ge=0, description="Offset para paginação")
+):
+    """
+    Rota alternativa com barra final para evitar redirecionamentos.
+    """
+    return await list_users(current_user, search, role, is_active, limit, offset)
+
+@router.post("", response_model=UserProfile, summary="Criar novo usuário (apenas owner/admin)")
 async def create_user(user_data: UserCreate, current_user: UserProfile = Depends(get_current_user)):
     """
     Cria um novo usuário na empresa.
