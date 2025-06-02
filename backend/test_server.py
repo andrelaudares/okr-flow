@@ -1,119 +1,163 @@
 #!/usr/bin/env python3
 """
-Script para testar a saúde do servidor OKR Backend
-Uso: python test_server.py [--url URL]
+Script de teste para verificar se o servidor está funcionando corretamente
+Uso: python test_server.py [--url URL] [--requests NUM]
 """
 
 import argparse
-import requests
+import asyncio
+import aiohttp
 import time
 import sys
-from datetime import datetime
+from typing import List, Dict, Any
 
-def test_health_check(base_url):
-    """Testa o endpoint de health check"""
+async def test_endpoint(session: aiohttp.ClientSession, url: str, name: str) -> Dict[str, Any]:
+    """Testa um endpoint específico"""
+    start_time = time.time()
     try:
-        print(f"🔍 Testando health check em {base_url}")
-        start_time = time.time()
-        
-        response = requests.get(f"{base_url}/", timeout=10)
-        
+        async with session.get(url) as response:
+            end_time = time.time()
+            response_time = (end_time - start_time) * 1000  # em ms
+            
+            data = await response.json()
+            
+            return {
+                "name": name,
+                "status": response.status,
+                "response_time": round(response_time, 2),
+                "success": response.status == 200,
+                "data": data
+            }
+    except Exception as e:
         end_time = time.time()
         response_time = (end_time - start_time) * 1000
         
-        if response.status_code == 200:
-            data = response.json()
-            print(f"✅ Health check OK")
-            print(f"   Status: {data.get('status', 'N/A')}")
-            print(f"   Versão: {data.get('version', 'N/A')}")
-            print(f"   Tempo de resposta: {response_time:.2f}ms")
-            return True
-        else:
-            print(f"❌ Health check falhou - Status: {response.status_code}")
-            return False
-            
-    except requests.exceptions.Timeout:
-        print(f"⏰ Timeout na requisição (>10s)")
-        return False
-    except requests.exceptions.ConnectionError:
-        print(f"🔌 Erro de conexão - Servidor pode estar offline")
-        return False
-    except Exception as e:
-        print(f"❌ Erro inesperado: {e}")
-        return False
+        return {
+            "name": name,
+            "status": 0,
+            "response_time": round(response_time, 2),
+            "success": False,
+            "error": str(e)
+        }
 
-def test_load(base_url, num_requests=10):
-    """Testa a capacidade de resposta com múltiplas requisições"""
-    print(f"\n🚀 Testando carga com {num_requests} requisições...")
+async def test_server_performance(base_url: str, num_requests: int = 10) -> List[Dict[str, Any]]:
+    """Testa a performance do servidor"""
     
-    success_count = 0
-    total_time = 0
-    response_times = []
+    endpoints = [
+        ("/", "Health Check"),
+        ("/health", "Health Detail"),
+        ("/docs", "API Docs")
+    ]
     
-    for i in range(num_requests):
-        try:
-            start_time = time.time()
-            response = requests.get(f"{base_url}/", timeout=10)
-            end_time = time.time()
+    results = []
+    
+    async with aiohttp.ClientSession() as session:
+        print(f"🧪 Testando servidor: {base_url}")
+        print(f"📊 Fazendo {num_requests} requests por endpoint...\n")
+        
+        for endpoint, name in endpoints:
+            url = f"{base_url}{endpoint}"
+            endpoint_results = []
             
-            response_time = (end_time - start_time) * 1000
-            response_times.append(response_time)
-            total_time += response_time
+            print(f"🔍 Testando {name} ({endpoint})...")
             
-            if response.status_code == 200:
-                success_count += 1
-                print(f"   Requisição {i+1}/{num_requests}: ✅ {response_time:.2f}ms")
+            # Fazer múltiplas requests
+            tasks = []
+            for i in range(num_requests):
+                task = test_endpoint(session, url, f"{name} #{i+1}")
+                tasks.append(task)
+            
+            endpoint_results = await asyncio.gather(*tasks)
+            
+            # Calcular estatísticas
+            successful_results = [r for r in endpoint_results if r["success"]]
+            success_rate = len(successful_results) / len(endpoint_results) * 100
+            
+            if successful_results:
+                avg_time = sum(r["response_time"] for r in successful_results) / len(successful_results)
+                min_time = min(r["response_time"] for r in successful_results)
+                max_time = max(r["response_time"] for r in successful_results)
             else:
-                print(f"   Requisição {i+1}/{num_requests}: ❌ Status {response.status_code}")
-                
-        except Exception as e:
-            print(f"   Requisição {i+1}/{num_requests}: ❌ Erro: {e}")
+                avg_time = min_time = max_time = 0
+            
+            print(f"   ✅ Taxa de sucesso: {success_rate:.1f}%")
+            print(f"   ⏱️  Tempo médio: {avg_time:.2f}ms")
+            print(f"   🚀 Tempo mínimo: {min_time:.2f}ms")
+            print(f"   🐌 Tempo máximo: {max_time:.2f}ms")
+            
+            if not successful_results:
+                print(f"   ❌ Erros encontrados:")
+                for result in endpoint_results:
+                    if not result["success"]:
+                        print(f"      - {result.get('error', 'Erro desconhecido')}")
+            
+            print()
+            
+            results.extend(endpoint_results)
     
-    if response_times:
-        avg_time = sum(response_times) / len(response_times)
-        min_time = min(response_times)
-        max_time = max(response_times)
-        
-        print(f"\n📊 Resultados do teste de carga:")
-        print(f"   Sucessos: {success_count}/{num_requests} ({(success_count/num_requests)*100:.1f}%)")
-        print(f"   Tempo médio: {avg_time:.2f}ms")
-        print(f"   Tempo mínimo: {min_time:.2f}ms")
-        print(f"   Tempo máximo: {max_time:.2f}ms")
-        
-        return success_count == num_requests
-    
-    return False
+    return results
 
-def main():
-    parser = argparse.ArgumentParser(description='Testar servidor OKR Backend')
+def analyze_results(results: List[Dict[str, Any]]):
+    """Analisa os resultados dos testes"""
+    successful = [r for r in results if r["success"]]
+    failed = [r for r in results if not r["success"]]
+    
+    print("📈 RESUMO DOS TESTES:")
+    print(f"   📊 Total de requests: {len(results)}")
+    print(f"   ✅ Sucessos: {len(successful)}")
+    print(f"   ❌ Falhas: {len(failed)}")
+    print(f"   📈 Taxa de sucesso geral: {len(successful)/len(results)*100:.1f}%")
+    
+    if successful:
+        avg_time = sum(r["response_time"] for r in successful) / len(successful)
+        print(f"   ⏱️  Tempo médio geral: {avg_time:.2f}ms")
+        
+        if avg_time < 100:
+            print("   🚀 Performance EXCELENTE!")
+        elif avg_time < 500:
+            print("   👍 Performance BOA!")
+        elif avg_time < 1000:
+            print("   ⚠️  Performance ACEITÁVEL")
+        else:
+            print("   🐌 Performance LENTA - considere otimizações")
+    
+    print()
+
+async def main():
+    """Função principal"""
+    parser = argparse.ArgumentParser(description='Teste de Performance do Servidor OKR')
     parser.add_argument('--url', type=str, default='http://localhost:8000', 
                        help='URL base do servidor (padrão: http://localhost:8000)')
-    parser.add_argument('--load', type=int, default=10, 
-                       help='Número de requisições para teste de carga (padrão: 10)')
+    parser.add_argument('--requests', type=int, default=10, 
+                       help='Número de requests por endpoint (padrão: 10)')
     
     args = parser.parse_args()
     
-    print(f"🧪 Testando servidor OKR Backend")
-    print(f"   URL: {args.url}")
-    print(f"   Horário: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("-" * 50)
-    
-    # Teste básico de health check
-    health_ok = test_health_check(args.url)
-    
-    if health_ok:
-        # Teste de carga se o health check passou
-        load_ok = test_load(args.url, args.load)
+    try:
+        print("🔧 Iniciando testes de performance do Sistema OKR Backend...")
+        print(f"🎯 Alvo: {args.url}")
+        print(f"🔢 Requests por endpoint: {args.requests}")
+        print()
         
-        if load_ok:
-            print(f"\n🎉 Todos os testes passaram! Servidor está funcionando bem.")
-            sys.exit(0)
+        results = await test_server_performance(args.url, args.requests)
+        analyze_results(results)
+        
+        # Verificar se há problemas críticos
+        failed_results = [r for r in results if not r["success"]]
+        if failed_results:
+            print("⚠️  ATENÇÃO: Foram encontrados problemas!")
+            return 1
         else:
-            print(f"\n⚠️ Teste de carga falhou. Servidor pode ter problemas de performance.")
-            sys.exit(1)
-    else:
-        print(f"\n❌ Health check falhou. Servidor não está respondendo adequadamente.")
-        sys.exit(1)
+            print("🎉 Todos os testes passaram com sucesso!")
+            return 0
+            
+    except KeyboardInterrupt:
+        print("\n🛑 Testes interrompidos pelo usuário.")
+        return 1
+    except Exception as e:
+        print(f"\n❌ Erro durante os testes: {e}")
+        return 1
 
 if __name__ == "__main__":
-    main() 
+    exit_code = asyncio.run(main())
+    sys.exit(exit_code) 
