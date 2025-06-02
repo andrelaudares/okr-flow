@@ -34,7 +34,7 @@ async def debug_users(current_user: UserProfile = Depends(get_current_user)):
         print(f"DEBUG: Role: {current_user.role}")
         
         # Teste simples de query
-        test_query = supabase_admin.from_('users').select('id, name, email').eq('company_id', str(current_user.company_id)).limit(1).execute()
+        test_query = supabase_admin().from_('users').select('id, name, email').eq('company_id', str(current_user.company_id)).limit(1).execute()
         
         return {
             "status": "OK",
@@ -80,7 +80,7 @@ async def list_users(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Buscar usuários da mesma empresa
-        query = supabase_admin.from_('users').select(
+        query = supabase_admin().from_('users').select(
             "id, email, username, name, role, team_id, is_owner, is_active, created_at",
             count='exact'
         ).eq('company_id', str(current_user.company_id))
@@ -163,12 +163,12 @@ async def create_user(user_data: UserCreate, current_user: UserProfile = Depends
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Verificar se email já existe
-        existing_user = supabase_admin.from_('users').select("id").eq('email', user_data.email).execute()
+        existing_user = supabase_admin().from_('users').select("id").eq('email', user_data.email).execute()
         if existing_user.data:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já está em uso")
         
         # Registrar no Supabase Auth
-        auth_response = supabase_admin.auth.sign_up({
+        auth_response = supabase_admin().auth.sign_up({
             "email": user_data.email,
             "password": user_data.password
         })
@@ -194,18 +194,18 @@ async def create_user(user_data: UserCreate, current_user: UserProfile = Depends
             'updated_at': 'now()'
         }
         
-        response = supabase_admin.from_('users').insert(user_db_data).execute()
+        response = supabase_admin().from_('users').insert(user_db_data).execute()
         
         if not response.data:
             # Rollback: remover do Auth
             try:
-                supabase_admin.auth.admin.delete_user(user_id)
+                supabase_admin().auth.admin.delete_user(user_id)
             except:
                 pass
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao salvar dados do usuário")
         
         # Buscar dados completos do usuário criado
-        full_user = supabase_admin.from_('users').select("*").eq('id', str(user_id)).single().execute()
+        full_user = supabase_admin().from_('users').select("*").eq('id', str(user_id)).single().execute()
         
         if not full_user.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Usuário criado mas erro ao buscar dados")
@@ -228,7 +228,7 @@ async def get_user(user_id: str, current_user: UserProfile = Depends(get_current
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Buscar usuário da mesma empresa
-        response = supabase_admin.from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
+        response = supabase_admin().from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
         
         if not response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
@@ -254,7 +254,7 @@ async def update_user(user_id: str, user_data: UserUpdate, current_user: UserPro
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Buscar usuário a ser atualizado
-        target_user_response = supabase_admin.from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
+        target_user_response = supabase_admin().from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
         
         if not target_user_response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
@@ -288,13 +288,13 @@ async def update_user(user_id: str, user_data: UserUpdate, current_user: UserPro
         
         if update_data:
             update_data['updated_at'] = 'now()'
-            response = supabase_admin.from_('users').update(update_data).eq('id', user_id).execute()
+            response = supabase_admin().from_('users').update(update_data).eq('id', user_id).execute()
             
             if not response.data:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao atualizar usuário")
         
         # Buscar dados atualizados
-        updated_user = supabase_admin.from_('users').select("*").eq('id', user_id).single().execute()
+        updated_user = supabase_admin().from_('users').select("*").eq('id', user_id).single().execute()
         
         if not updated_user.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao buscar dados atualizados")
@@ -327,17 +327,17 @@ async def delete_user(user_id: str, current_user: UserProfile = Depends(get_curr
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Verificar se usuário existe na mesma empresa
-        target_user = supabase_admin.from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
+        target_user = supabase_admin().from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
         
         if not target_user.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
         
         # Deletar usuário da tabela users
-        delete_response = supabase_admin.from_('users').delete().eq('id', user_id).execute()
+        delete_response = supabase_admin().from_('users').delete().eq('id', user_id).execute()
         
         # Tentar deletar do Supabase Auth (se falhar, não é crítico)
         try:
-            supabase_admin.auth.admin.delete_user(user_id)
+            supabase_admin().auth.admin.delete_user(user_id)
         except Exception as e:
             print(f"DEBUG: Erro ao deletar usuário do Auth (não crítico): {e}")
         
@@ -369,7 +369,7 @@ async def toggle_user_status(user_id: str, is_active: bool, current_user: UserPr
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Buscar usuário a ser alterado
-        target_user = supabase_admin.from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
+        target_user = supabase_admin().from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
         
         if not target_user.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
@@ -389,7 +389,7 @@ async def toggle_user_status(user_id: str, is_active: bool, current_user: UserPr
             'updated_at': 'now()'
         }
         
-        response = supabase_admin.from_('users').update(update_data).eq('id', user_id).execute()
+        response = supabase_admin().from_('users').update(update_data).eq('id', user_id).execute()
         
         if not response.data:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro ao atualizar status do usuário")
@@ -422,7 +422,7 @@ async def change_user_password(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário não possui empresa associada")
         
         # Buscar usuário alvo
-        target_user_response = supabase_admin.from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
+        target_user_response = supabase_admin().from_('users').select("*").eq('id', user_id).eq('company_id', str(current_user.company_id)).single().execute()
         
         if not target_user_response.data:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
@@ -438,7 +438,7 @@ async def change_user_password(
         
         # TENTATIVA 1: Método admin direto
         try:
-            update_response = supabase_admin.auth.admin.update_user_by_id(
+            update_response = supabase_admin().auth.admin.update_user_by_id(
                 user_id, 
                 {"password": password_data.new_password}
             )

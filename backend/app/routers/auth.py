@@ -51,7 +51,7 @@ class UserRegistration(BaseModel):
 
 def check_supabase_config():
     """Verifica se o Supabase está configurado"""
-    if not supabase_client or not supabase_admin:
+    if not supabase_client() or not supabase_admin():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Serviço não configurado. Configure as variáveis de ambiente SUPABASE_URL, SUPABASE_KEY e SUPABASE_SERVICE_KEY."
@@ -71,7 +71,7 @@ async def register_user(user_data: UserRegister):
         
         # Verificar se email já existe na tabela users
         try:
-            existing_user = supabase_admin.from_('users').select("id").eq('email', user_data.email).execute()
+            existing_user = supabase_admin().from_('users').select("id").eq('email', user_data.email).execute()
             if existing_user.data:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já está em uso")
         except Exception as e:
@@ -80,7 +80,7 @@ async def register_user(user_data: UserRegister):
         # 1. Registrar usuário no Supabase Auth
         print("DEBUG: Tentando registrar usuário no Supabase Auth...")
         try:
-            auth_response = supabase_admin.auth.sign_up({
+            auth_response = supabase_admin().auth.sign_up({
                 "email": user_data.email, 
                 "password": user_data.password
             })
@@ -114,7 +114,7 @@ async def register_user(user_data: UserRegister):
         }
         
         try:
-            company_response = supabase_admin.from_('companies').insert(company_data).execute()
+            company_response = supabase_admin().from_('companies').insert(company_data).execute()
             print(f"DEBUG: Empresa criada com sucesso")
             if not company_response.data:
                 raise Exception("Erro ao inserir empresa")
@@ -122,7 +122,7 @@ async def register_user(user_data: UserRegister):
             print(f"DEBUG: Erro ao criar empresa: {e_company}")
             # Rollback Auth
             try:
-                supabase_admin.auth.admin.delete_user(user_id)
+                supabase_admin().auth.admin.delete_user(user_id)
                 print("DEBUG: Rollback do usuário Auth executado")
             except Exception as rollback_err:
                 print(f"DEBUG: Erro no rollback Auth: {rollback_err}")
@@ -170,7 +170,7 @@ async def register_user(user_data: UserRegister):
 
         try:
             print("DEBUG: Inserindo usuário na tabela users...")
-            user_response = supabase_admin.from_('users').insert(user_data_db).execute()
+            user_response = supabase_admin().from_('users').insert(user_data_db).execute()
             print(f"DEBUG: Usuário inserido com sucesso na tabela users: {user_response}")
             
             if not user_response.data:
@@ -181,7 +181,7 @@ async def register_user(user_data: UserRegister):
             print(f"DEBUG: Erro ao inserir usuário na tabela users: {e_user_insert}")
             # Rollback completo: remover empresa, cliente Asaas (se criado) e usuário do Auth
             try:
-                supabase_admin.from_('companies').delete().eq('id', company_id).execute()
+                supabase_admin().from_('companies').delete().eq('id', company_id).execute()
                 print(f"DEBUG: Rollback da empresa {company_id} executado.")
                 if asaas_customer_id:
                     # Tentar deletar cliente Asaas apenas se foi criado
@@ -190,7 +190,7 @@ async def register_user(user_data: UserRegister):
                         print(f"DEBUG: Rollback do cliente Asaas {asaas_customer_id} executado.")
                     except Exception as e_asaas_delete:
                         print(f"DEBUG: Erro no rollback do cliente Asaas (não crítico): {e_asaas_delete}")
-                supabase_admin.auth.admin.delete_user(user_id)
+                supabase_admin().auth.admin.delete_user(user_id)
                 print(f"DEBUG: Rollback do usuário Auth {user_id} executado.")
             except Exception as rollback_err_full:
                 print(f"DEBUG: Erro crítico no rollback completo: {rollback_err_full}")
@@ -233,7 +233,7 @@ async def login_user(user_data: UserLogin, request: Request):
         # Fazer login no Supabase Auth com configuração personalizada
         try:
             # Tentativa de login padrão
-            auth_response = supabase_client.auth.sign_in_with_password({
+            auth_response = supabase_client().auth.sign_in_with_password({
                 "email": user_data.email,
                 "password": user_data.password
             })
@@ -255,7 +255,7 @@ async def login_user(user_data: UserLogin, request: Request):
         try:
             # Tentar com cliente admin padrão
             try:
-                user_check = supabase_admin.from_('users').select("*").eq('email', user_data.email).execute()
+                user_check = supabase_admin().from_('users').select("*").eq('email', user_data.email).execute()
             except Exception as e_first:
                 error_msg = str(e_first)
                 if 'JWT expired' in error_msg or 'PGRST301' in error_msg:
@@ -270,7 +270,7 @@ async def login_user(user_data: UserLogin, request: Request):
             
             if not user_check.data:
                 # Se usuário não existe na tabela users, fazer logout do Auth
-                supabase_client.auth.sign_out()
+                supabase_client().auth.sign_out()
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED, 
                     detail="Usuário não encontrado no sistema. Entre em contato com o administrador."
@@ -280,7 +280,7 @@ async def login_user(user_data: UserLogin, request: Request):
             
             # Verificar se usuário está ativo (removido temporariamente para debug)
             if not user_profile.get('is_active', True):
-                supabase_client.auth.sign_out()
+                supabase_client().auth.sign_out()
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED, 
                     detail="Usuário desativado. Entre em contato com o administrador."
@@ -291,7 +291,7 @@ async def login_user(user_data: UserLogin, request: Request):
         except Exception as e_user_check:
             print(f"DEBUG: Erro ao verificar usuário na tabela: {e_user_check}")
             # Se não conseguir verificar, invalidar sessão por segurança
-            supabase_client.auth.sign_out()
+            supabase_client().auth.sign_out()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
                 detail="Erro interno ao verificar usuário. Tente novamente."
@@ -378,7 +378,7 @@ async def logout_user(request: Request, current_user: UserProfile = Depends(get_
             print(f"DEBUG: Erro ao revogar sessão no banco (não crítico): {e_session}")
         
         # Usar o cliente global para logout
-        supabase_client.auth.sign_out()
+        supabase_client().auth.sign_out()
         return {"message": "Logout realizado com sucesso"}
     except Exception as e:
         print(f"DEBUG: Erro no logout: {e}")
@@ -403,7 +403,7 @@ async def refresh_token(refresh_data: dict, request: Request):
         print(f"DEBUG: Tentativa de refresh token")
         
         # Tentar refresh da sessão
-        auth_response = supabase_client.auth.refresh_session(refresh_token)
+        auth_response = supabase_client().auth.refresh_session(refresh_token)
         
         if not auth_response.session:
             raise HTTPException(
@@ -413,9 +413,9 @@ async def refresh_token(refresh_data: dict, request: Request):
         
         # Obter dados do usuário para incluir na resposta
         try:
-            user_response = supabase_client.auth.get_user(auth_response.session.access_token)
+            user_response = supabase_client().auth.get_user(auth_response.session.access_token)
             if user_response.user:
-                user_check = supabase_admin.from_('users').select("*").eq('email', user_response.user.email).execute()
+                user_check = supabase_admin().from_('users').select("*").eq('email', user_response.user.email).execute()
                 if user_check.data:
                     user_profile = user_check.data[0]
                 else:
@@ -498,7 +498,7 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
     
     try:
         # Verificar se usuário existe e está ativo
-        user_check = supabase_admin.from_('users').select("is_active").eq('email', reset_data.email).execute()
+        user_check = supabase_admin().from_('users').select("is_active").eq('email', reset_data.email).execute()
         
         if not user_check.data:
             # Por segurança, retornamos sucesso mesmo se usuário não existe
@@ -511,7 +511,7 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
             return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
         
         # Enviar email de reset pelo Supabase Auth
-        reset_response = supabase_admin.auth.reset_password_email(reset_data.email)
+        reset_response = supabase_admin().auth.reset_password_email(reset_data.email)
         
         print(f"DEBUG: Reset de senha solicitado para: {reset_data.email}")
         
@@ -531,7 +531,7 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
     
     try:
         # Verificar e usar os tokens para autenticar
-        session_response = supabase_admin.auth.set_session(
+        session_response = supabase_admin().auth.set_session(
             access_token=update_data.access_token,
             refresh_token=update_data.refresh_token
         )
@@ -540,7 +540,7 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tokens inválidos ou expirados")
         
         # Atualizar senha
-        user_response = supabase_admin.auth.update_user({
+        user_response = supabase_admin().auth.update_user({
             "password": update_data.new_password
         })
         
@@ -548,7 +548,7 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha")
         
         # Verificar se usuário ainda está ativo
-        user_check = supabase_admin.from_('users').select("is_active").eq('email', user_response.user.email).execute()
+        user_check = supabase_admin().from_('users').select("is_active").eq('email', user_response.user.email).execute()
         
         if user_check.data and not user_check.data[0].get('is_active', True):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário desativado")
@@ -574,7 +574,7 @@ async def change_password(password_data: ChangePasswordRequest, current_user: Us
     try:
         # Verificar senha atual fazendo login
         try:
-            login_response = supabase_client.auth.sign_in_with_password({
+            login_response = supabase_client().auth.sign_in_with_password({
                 "email": current_user.email,
                 "password": password_data.current_password
             })
@@ -589,7 +589,7 @@ async def change_password(password_data: ChangePasswordRequest, current_user: Us
         # Atualizar senha usando o token da sessão atual
         try:
             # Usar o cliente autenticado para atualizar a senha
-            update_response = supabase_client.auth.update_user({
+            update_response = supabase_client().auth.update_user({
                 "password": password_data.new_password
             })
             
@@ -600,7 +600,7 @@ async def change_password(password_data: ChangePasswordRequest, current_user: Us
             print(f"DEBUG: Erro ao atualizar senha via cliente: {e}")
             # Tentar via admin como fallback
             try:
-                update_response = supabase_admin.auth.admin.update_user_by_id(
+                update_response = supabase_admin().auth.admin.update_user_by_id(
                     str(current_user.id),
                     {"password": password_data.new_password}
                 )

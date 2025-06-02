@@ -110,6 +110,7 @@ app.add_middleware(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://okr.nobug.com.br",  # Novo domínio personalizado
         "https://okr-flow.vercel.app",
         "https://okr-flow-andrelaudares-projects.vercel.app",
         "https://okr-flow-*.vercel.app",  # Para preview deploys

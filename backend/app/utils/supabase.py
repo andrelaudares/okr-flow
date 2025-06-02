@@ -114,22 +114,22 @@ _supabase_client = None
 _supabase_admin = None
 _supabase_super_admin = None
 
-@property
 def supabase_client():
+    """Retorna cliente Supabase global, criando se necessário"""
     global _supabase_client
     if not _supabase_client:
         _supabase_client = get_supabase_client()
     return _supabase_client
 
-@property 
 def supabase_admin():
+    """Retorna cliente Supabase admin global, criando se necessário"""
     global _supabase_admin
     if not _supabase_admin:
         _supabase_admin = get_supabase_admin()
     return _supabase_admin
 
-@property
 def supabase_super_admin():
+    """Retorna cliente Supabase super admin global, criando se necessário"""
     global _supabase_super_admin
     if not _supabase_super_admin:
         _supabase_super_admin = get_supabase_super_admin()
