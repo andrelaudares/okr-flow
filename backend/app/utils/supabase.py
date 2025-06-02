@@ -56,27 +56,8 @@ def get_supabase_admin(force_refresh: bool = False) -> Client:
     if force_refresh or _should_refresh_connection() or cache_key not in _admin_cache:
         try:
             print("DEBUG: Criando novo cliente Supabase Admin (service_role)")
-            # Criar cliente admin com configurações especiais para longevidade
-            admin_client = create_client(
-                SUPABASE_URL, 
-                SUPABASE_SERVICE_KEY,
-                options={
-                    "auth": {
-                        "auto_refresh_token": True,
-                        "persist_session": True,
-                        "detect_session_in_url": False,
-                    },
-                    "db": {
-                        "schema": "public",
-                    },
-                    "global": {
-                        "headers": {
-                            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                            "apikey": SUPABASE_SERVICE_KEY,
-                        }
-                    }
-                }
-            )
+            # Cliente admin simples - sem configurações complexas
+            admin_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
             _admin_cache[cache_key] = admin_client
         except Exception as e:
             print(f"DEBUG: Erro ao criar cliente Supabase Admin: {e}")
@@ -90,23 +71,8 @@ def get_supabase_super_admin() -> Client:
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         return None
     
-    # Criar um cliente especial com configurações máximas de privilégio
-    super_admin = create_client(
-        SUPABASE_URL, 
-        SUPABASE_SERVICE_KEY,
-        options={
-            "auth": {
-                "auto_refresh_token": True,
-                "persist_session": True,
-            },
-            "global": {
-                "headers": {
-                    "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-                    "apikey": SUPABASE_SERVICE_KEY,
-                }
-            }
-        }
-    )
+    # Cliente super admin simples - sem configurações complexas
+    super_admin = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     return super_admin
 
 # Instâncias globais com inicialização lazy
