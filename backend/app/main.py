@@ -55,23 +55,11 @@ app.add_middleware(
 # CORS otimizado e mais limpo - CORRIGIDO para produção
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000", 
-        "http://localhost:5173", 
-        "http://localhost:8080", 
-        "http://127.0.0.1:5173", 
-        "http://127.0.0.1:8080",
-        "https://okr-flow-git-main-andrelaudares-projects.vercel.app", 
-        "https://okr-flow.vercel.app", 
-        "https://okr-flow-production.up.railway.app", 
-        "https://okr-flow-kdzrqf3ft-andrelaudares-projects.vercel.app",
-        "*"  # Temporário para debug - remover depois
-    ],
+    allow_origins=["*"],  # Modificado para wildcard
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],  # Permite todos os headers
+    allow_headers=["*"],  # Modificado para wildcard
 )
-
 # Incluir os roteadores com prefixos da API - SEM barra final!
 app.include_router(auth.router, prefix="/api/auth", tags=["Autenticação"])
 app.include_router(users.router, prefix="/api/users", tags=["Usuários"])
