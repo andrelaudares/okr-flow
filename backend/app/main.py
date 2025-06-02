@@ -4,23 +4,77 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+import asyncio
+import time
 from .routers import auth, users, subscriptions, companies, cycles, dashboard, objectives, key_results, reports, analytics, notifications, global_cycles
 from .core.settings import settings
+
+# Task para renovação automática de conexões
+_refresh_task = None
+
+async def refresh_connections_periodically():
+    """Task que roda em background para renovar conexões do Supabase periodicamente"""
+    from .utils.supabase import refresh_all_connections, check_connection
+    
+    while True:
+        try:
+            # Aguardar 1 hora (3600 segundos)
+            await asyncio.sleep(3600)
+            
+            print("🔄 Verificando conexões Supabase...")
+            
+            # Verificar se a conexão está funcionando
+            if not check_connection():
+                print("⚠️  Conexão Supabase com problemas, renovando...")
+                refresh_all_connections()
+            else:
+                print("✅ Conexões Supabase funcionando normalmente")
+                
+        except asyncio.CancelledError:
+            print("🛑 Task de renovação de conexões cancelada")
+            break
+        except Exception as e:
+            print(f"❌ Erro na task de renovação: {e}")
+            # Continuar mesmo com erro
+            await asyncio.sleep(300)  # Aguardar 5 minutos antes de tentar novamente
 
 # Lifecycle manager otimizado para startup/shutdown
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _refresh_task
+    
     # Startup
     print("🚀 Sistema OKR Backend iniciando...")
     print(f"   🗜️  Compressão GZip: {'Ativada' if settings.ENABLE_GZIP else 'Desativada'}")
     print(f"   💾 Cache TTL: {settings.CACHE_TTL}s")
     print(f"   🔧 Configurações carregadas com sucesso")
-    # Aqui você pode adicionar inicializações de pools de conexão, cache, etc.
+    
+    # Verificar conexão inicial
+    from .utils.supabase import check_connection
+    if check_connection():
+        print("✅ Conexão inicial com Supabase: OK")
+    else:
+        print("⚠️  Conexão inicial com Supabase: FALHOU")
+    
+    # Iniciar task de renovação automática de conexões
+    print("🔄 Iniciando sistema de renovação automática de conexões...")
+    _refresh_task = asyncio.create_task(refresh_connections_periodically())
+    
     yield
+    
     # Shutdown
     print("🛑 Sistema OKR Backend finalizando...")
     print("   🧹 Limpando recursos...")
-    # Aqui você pode limpar recursos, fechar conexões, etc.
+    
+    # Cancelar task de renovação
+    if _refresh_task:
+        _refresh_task.cancel()
+        try:
+            await _refresh_task
+        except asyncio.CancelledError:
+            pass
+    
+    print("✅ Shutdown completo")
 
 # Configuração otimizada do FastAPI
 app = FastAPI(
@@ -84,11 +138,16 @@ app.include_router(global_cycles.router, prefix="/api/global-cycles", tags=["Cic
 @app.get("/")
 async def root():
     """Health Check endpoint otimizado"""
+    from .utils.supabase import check_connection
+    
+    supabase_status = "OK" if check_connection() else "ERROR"
+    
     return {
         "message": "Bem-vindo à API do Sistema OKR",
         "status": "API está online",
         "version": "1.0.0",
         "sprint": "Sprint 9 - Sistema de Notificações e Integrações",
+        "supabase_connection": supabase_status,
         "performance": {
             "gzip_enabled": settings.ENABLE_GZIP,
             "cache_ttl": settings.CACHE_TTL,
@@ -99,15 +158,45 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Endpoint adicional para verificação de saúde"""
+    from .utils.supabase import check_connection
+    
+    supabase_status = check_connection()
+    
     return {
-        "status": "healthy", 
+        "status": "healthy" if supabase_status else "degraded", 
         "timestamp": "2024",
+        "supabase": "connected" if supabase_status else "disconnected",
         "config": {
             "workers": settings.WORKERS_COUNT,
             "timeout_keep_alive": settings.TIMEOUT_KEEP_ALIVE,
             "environment": "production" if settings.LOG_LEVEL == "WARNING" else "development"
         }
     }
+
+@app.post("/admin/refresh-connections")
+async def force_refresh_connections():
+    """Endpoint administrativo para forçar renovação de conexões"""
+    try:
+        from .utils.supabase import refresh_all_connections, check_connection
+        
+        print("🔧 Renovação manual de conexões solicitada...")
+        refresh_all_connections()
+        
+        # Verificar se funcionou
+        status = check_connection()
+        
+        return {
+            "message": "Conexões renovadas com sucesso",
+            "supabase_status": "OK" if status else "ERROR",
+            "timestamp": time.time()
+        }
+    except Exception as e:
+        print(f"❌ Erro na renovação manual: {e}")
+        return {
+            "message": "Erro ao renovar conexões",
+            "error": str(e),
+            "timestamp": time.time()
+        }
 
 # Configuração para execução direta (opcional)
 if __name__ == "__main__":

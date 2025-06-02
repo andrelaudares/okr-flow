@@ -253,7 +253,20 @@ async def login_user(user_data: UserLogin, request: Request):
 
         # Verificar se usuário existe na tabela users
         try:
-            user_check = supabase_admin.from_('users').select("*").eq('email', user_data.email).execute()
+            # Tentar com cliente admin padrão
+            try:
+                user_check = supabase_admin.from_('users').select("*").eq('email', user_data.email).execute()
+            except Exception as e_first:
+                error_msg = str(e_first)
+                if 'JWT expired' in error_msg or 'PGRST301' in error_msg:
+                    print("DEBUG: Token JWT do admin expirado, renovando conexão...")
+                    # Renovar conexão admin e tentar novamente
+                    from ..utils.supabase import refresh_all_connections, get_admin_client
+                    refresh_all_connections()
+                    supabase_admin_new = get_admin_client()
+                    user_check = supabase_admin_new.from_('users').select("*").eq('email', user_data.email).execute()
+                else:
+                    raise e_first
             
             if not user_check.data:
                 # Se usuário não existe na tabela users, fazer logout do Auth
