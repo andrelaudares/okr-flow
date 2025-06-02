@@ -226,8 +226,8 @@ async def create_key_result(
             kr_data.target_value
         )
         
-        # Determinar status inicial baseado no progresso
-        initial_status = update_status_based_on_progress(progress)
+        # Key Results recém-criados sempre começam como PLANNED
+        initial_status = "PLANNED"
         
         # Preparar dados do Key Result
         kr_db_data = {

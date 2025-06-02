@@ -1,16 +1,13 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { toast } from 'sonner';
 
-// Base URL do backend - detecta automaticamente o ambiente
-const BASE_URL = import.meta.env.PROD 
-  ? 'https://okr-flow-production.up.railway.app' // Atualizado pelo ngrok
-  : 'http://localhost:8000';
-
-// Interface para resposta de erro da API
+// Definição de tipos para as respostas de erro da API
 interface ApiErrorResponse {
-  detail: string;
+  detail?: string;
   message?: string;
 }
+
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // Criar instância do Axios
 const api: AxiosInstance = axios.create({
@@ -20,6 +17,9 @@ const api: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Flag para evitar múltiplos toasts de expiração
+let isTokenExpiredToastShown = false;
 
 // Interceptor para adicionar token nas requisições
 api.interceptors.request.use(
@@ -35,71 +35,102 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para tratar respostas e erros
+// Interceptor para tratar respostas e erros - MELHORADO
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
     const originalRequest = error.config;
 
-    // Tratamento de erro 401 (token expirado)
+    // Tratamento de erro 401 (token expirado) - MELHORADO
     if (error.response?.status === 401 && originalRequest) {
-      const refreshToken = localStorage.getItem('nobugOkrRefreshToken');
+      const errorDetail = error.response?.data?.detail || '';
       
-      if (refreshToken) {
-        try {
-          // Tentar refresh do token
-          const refreshResponse = await axios.post(`${BASE_URL}/api/auth/refresh`, {
-            refresh_token: refreshToken
+      // Verificar se é especificamente token expirado
+      const isTokenExpired = errorDetail.includes('expirado') || 
+                           errorDetail.includes('expired') || 
+                           errorDetail.includes('invalid JWT') ||
+                           errorDetail.includes('token has invalid claims');
+      
+      if (isTokenExpired) {
+        console.log('🔑 Token expirado detectado');
+        
+        // Mostrar toast apenas uma vez
+        if (!isTokenExpiredToastShown) {
+          isTokenExpiredToastShown = true;
+          
+          toast.error('Sessão Expirada', {
+            description: 'Sua sessão expirou. Você será redirecionado para fazer login novamente.',
+            duration: 5000,
+            action: {
+              label: 'Login',
+              onClick: () => {
+                window.location.href = '/login';
+              }
+            }
           });
           
-          const { access_token } = refreshResponse.data;
-          localStorage.setItem('nobugOkrToken', access_token);
-          
-          // Retry da requisição original
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          // Reset da flag após 10 segundos
+          setTimeout(() => {
+            isTokenExpiredToastShown = false;
+          }, 10000);
+        }
+        
+        // Tentar refresh primeiro
+        const refreshToken = localStorage.getItem('nobugOkrRefreshToken');
+        
+        if (refreshToken && !originalRequest.url?.includes('/refresh')) {
+          try {
+            console.log('🔄 Tentando refresh do token...');
+            const refreshResponse = await axios.post(`${BASE_URL}/api/auth/refresh`, {
+              refresh_token: refreshToken
+            });
+            
+            const { access_token, refresh_token: newRefreshToken } = refreshResponse.data;
+            
+            // Salvar novos tokens
+            setTokens(access_token, newRefreshToken);
+            
+            // Retry da requisição original
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${access_token}`;
+            }
+            
+            console.log('✅ Token refreshed com sucesso');
+            toast.success('Sessão renovada automaticamente');
+            
+            return api(originalRequest);
+          } catch (refreshError) {
+            console.log('❌ Refresh falhou:', refreshError);
+            // Se refresh falhou, fazer logout completo
+            handleTokenExpiration();
           }
-          
-          return api(originalRequest);
-        } catch (refreshError) {
-          // Refresh falhou, limpar tokens mas NÃO redirecionar automaticamente
-          clearTokens();
-          console.log('Token expirado, dados de autenticação limpos');
-          return Promise.reject(refreshError);
+        } else {
+          // Não há refresh token, fazer logout
+          handleTokenExpiration();
         }
       } else {
-        // Não há refresh token, limpar dados mas NÃO redirecionar automaticamente
+        // Não há refresh token ou não é token expirado, limpar dados
         clearTokens();
-        console.log('Nenhum refresh token, dados de autenticação limpos');
+        console.log('🚪 Dados de autenticação limpos');
       }
     }
 
-    // Tratamento de outros erros - mostrar toast apenas para erros relevantes
-    const errorMessage = error.response?.data?.detail || 
-                        error.response?.data?.message || 
-                        error.message || 
-                        'Erro inesperado';
-
-    // Mostrar toast apenas para erros que não sejam 401 (para evitar spam)
+    // Tratamento de outros erros - NÃO mostrar toast para 401 (já tratado acima)
     if (error.response?.status !== 401) {
-      switch (error.response?.status) {
-        case 403:
-          toast.error('Você não tem permissão para realizar esta ação');
-          break;
-        case 404:
-          toast.error('Recurso não encontrado');
-          break;
-        case 422:
-          toast.error('Dados inválidos: ' + errorMessage);
-          break;
-        case 500:
-          toast.error('Erro interno do servidor');
-          break;
-        default:
-          // Só mostrar toast para erros inesperados
-          if (error.response?.status && error.response.status >= 500) {
-            toast.error(errorMessage);
-          }
+      const errorMessage = error.response?.data?.detail || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Erro inesperado';
+      
+      // Mostrar toast apenas para erros relevantes
+      if (error.response?.status && error.response.status >= 500) {
+        toast.error('Erro do Servidor', {
+          description: 'Tente novamente em alguns instantes.',
+        });
+      } else if (error.response?.status === 403) {
+        toast.error('Acesso Negado', {
+          description: 'Você não tem permissão para esta ação.',
+        });
       }
     }
 
@@ -107,7 +138,18 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+// Função para tratar expiração completa do token
+const handleTokenExpiration = () => {
+  console.log('🔐 Fazendo logout completo devido à expiração');
+  
+  // Limpar todos os dados
+  clearTokens();
+  
+  // Redirecionar após um delay para mostrar o toast
+  setTimeout(() => {
+    window.location.href = '/login';
+  }, 2000);
+};
 
 // Helper para set/get tokens
 export const setTokens = (accessToken: string, refreshToken?: string) => {
@@ -128,4 +170,6 @@ export const clearTokens = () => {
   localStorage.removeItem('nobugOkrToken');
   localStorage.removeItem('nobugOkrRefreshToken');
   localStorage.removeItem('nobugOkrUser');
-}; 
+};
+
+export default api; 

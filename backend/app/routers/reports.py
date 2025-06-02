@@ -6,6 +6,7 @@ import os
 import tempfile
 from uuid import uuid4
 import asyncio
+import re
 
 from ..dependencies import get_current_user
 from ..models.user import UserProfile
@@ -23,6 +24,34 @@ router = APIRouter()
 # Cache simples para relatórios em memória (em produção, usar Redis)
 reports_cache: Dict[str, ReportMetadata] = {}
 reports_files: Dict[str, str] = {}  # ID -> filepath
+
+def safe_parse_datetime(date_string: str) -> datetime:
+    """
+    Função helper para parser seguro de datas ISO que podem ter microssegundos com muitos dígitos
+    """
+    if not date_string:
+        return datetime.now()
+    
+    try:
+        # Remover Z e adicionar timezone UTC
+        clean_date = date_string.replace('Z', '+00:00')
+        
+        # Se tem microssegundos com mais de 6 dígitos, truncar para 6
+        if '.' in clean_date and '+' in clean_date:
+            parts = clean_date.split('+')
+            date_part = parts[0]
+            tz_part = '+' + parts[1]
+            
+            if '.' in date_part:
+                main_part, microsec_part = date_part.split('.')
+                # Truncar microssegundos para 6 dígitos
+                microsec_part = microsec_part[:6].ljust(6, '0')
+                clean_date = f"{main_part}.{microsec_part}{tz_part}"
+        
+        return datetime.fromisoformat(clean_date)
+    except Exception as e:
+        print(f"DEBUG: Erro ao parser data '{date_string}': {e}")
+        return datetime.now()
 
 async def get_company_data(company_id: str):
     """Busca dados da empresa"""
@@ -103,8 +132,8 @@ async def get_single_objective_for_report(company_id: str, objective_id: str) ->
             cycle_name=obj['cycle']['name'] if obj.get('cycle') else 'Sem ciclo',
             status=obj.get('status', 'PLANNED'),
             progress=float(obj.get('progress', 0)),
-            created_at=datetime.fromisoformat(obj['created_at'].replace('Z', '+00:00')),
-            updated_at=datetime.fromisoformat(obj['updated_at'].replace('Z', '+00:00')),
+            created_at=safe_parse_datetime(obj['created_at']),
+            updated_at=safe_parse_datetime(obj['updated_at']),
             key_results_count=kr_count,
             key_results_completed=kr_completed,
             key_results=formatted_key_results
@@ -180,8 +209,8 @@ async def get_objectives_for_report(company_id: str, filters: ReportFilters) -> 
                 cycle_name=obj['cycle']['name'] if obj.get('cycle') else 'Sem ciclo',
                 status=obj.get('status', 'PLANNED'),
                 progress=float(obj.get('progress', 0)),
-                created_at=datetime.fromisoformat(obj['created_at'].replace('Z', '+00:00')),
-                updated_at=datetime.fromisoformat(obj['updated_at'].replace('Z', '+00:00')),
+                created_at=safe_parse_datetime(obj['created_at']),
+                updated_at=safe_parse_datetime(obj['updated_at']),
                 key_results_count=kr_count,
                 key_results_completed=kr_completed,
                 key_results=key_results
@@ -250,7 +279,7 @@ async def get_key_results_for_report(company_id: str, filters: ReportFilters) ->
             last_checkin_date = None
             
             if checkins_data:
-                last_checkin_date = datetime.fromisoformat(checkins_data[0]['checkin_date'].replace('Z', '+00:00'))
+                last_checkin_date = safe_parse_datetime(checkins_data[0]['checkin_date'])
             
             key_results.append(KeyResultReportData(
                 id=kr['id'],
@@ -265,8 +294,8 @@ async def get_key_results_for_report(company_id: str, filters: ReportFilters) ->
                 status=kr.get('status', 'PLANNED'),
                 progress=float(kr.get('progress', 0)),
                 confidence_level=float(kr.get('confidence_level', 0)) if kr.get('confidence_level') else None,
-                created_at=datetime.fromisoformat(kr['created_at'].replace('Z', '+00:00')),
-                updated_at=datetime.fromisoformat(kr['updated_at'].replace('Z', '+00:00')),
+                created_at=safe_parse_datetime(kr['created_at']),
+                updated_at=safe_parse_datetime(kr['updated_at']),
                 checkins_count=checkins_count,
                 last_checkin_date=last_checkin_date
             ))

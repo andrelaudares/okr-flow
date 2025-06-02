@@ -14,7 +14,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
     """
     Dependency otimizada para obter o usuário logado com base no token JWT.
-    Tokens têm duração de 7 dias por padrão no Supabase.
+    Agora com mensagens mais claras para tokens expirados.
     """
     try:
         print(f"DEBUG: Validando token JWT...")
@@ -38,7 +38,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
                 print(f"DEBUG: Token inválido ou usuário não encontrado")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token inválido ou expirado",
+                    detail="Token inválido ou expirado. Faça login novamente.",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
                 
@@ -56,57 +56,78 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
                     print(f"DEBUG: Token próximo da expiração. Exp: {token_exp}, Current: {current_time}")
             
         except Exception as e_auth:
+            error_str = str(e_auth).lower()
             print(f"DEBUG: Erro na validação do token: {e_auth}")
-            # Se der qualquer erro de autenticação, consideramos inválido
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token inválido ou expirado. Faça login novamente.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Buscar dados do usuário na tabela users usando o admin client otimizado
-        try:
-            response = supabase_admin.from_('users').select('*').eq('id', str(user_id)).execute()
             
-            if not response.data:
+            # Detectar diferentes tipos de erro de token
+            if any(phrase in error_str for phrase in ['expired', 'expirado', 'invalid jwt', 'token has invalid claims']):
+                # Token expirado - mensagem clara
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Sua sessão expirou. Faça login novamente para continuar.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            elif any(phrase in error_str for phrase in ['invalid signature', 'malformed', 'invalid token']):
+                # Token inválido/malformado 
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token de autenticação inválido. Faça login novamente.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            else:
+                # Erro genérico de autenticação
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Erro de autenticação. Faça login novamente.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        
+        # Buscar dados completos do usuário na tabela users
+        try:
+            # Buscar dados do usuário usando o cliente admin
+            user_response = supabase_admin.from_('users').select("*").eq('id', str(user_id)).single().execute()
+            
+            if not user_response.data:
                 print(f"DEBUG: Usuário {user_id} não encontrado na tabela users")
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Usuário não encontrado no sistema"
+                    detail="Dados do usuário não encontrados. Entre em contato com o administrador."
                 )
             
-            user_data = response.data[0]
+            user_data = user_response.data
+            print(f"DEBUG: Dados do usuário carregados: {user_data['name']} ({user_data['role']})")
             
             # Verificar se usuário está ativo
             if not user_data.get('is_active', True):
-                print(f"DEBUG: Usuário {user_id} está desativado")
+                print(f"DEBUG: Usuário {user_id} está inativo")
                 raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Usuário desativado. Entre em contato com o administrador.",
-                    headers={"WWW-Authenticate": "Bearer"},
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Sua conta foi desativada. Entre em contato com o administrador."
                 )
             
-            print(f"DEBUG: Dados do usuário recuperados com sucesso")
+            # Criar o objeto UserProfile
             return UserProfile(**user_data)
             
         except HTTPException:
+            # Re-raise HTTPExceptions específicas
             raise
         except Exception as e_db:
-            print(f"DEBUG: Erro ao buscar dados do usuário na tabela: {e_db}")
+            print(f"DEBUG: Erro ao buscar dados do usuário: {e_db}")
             print(f"DEBUG: Stack trace: {traceback.format_exc()}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro interno ao buscar dados do usuário"
+                detail="Erro interno ao validar usuário. Tente novamente."
             )
-
+            
     except HTTPException:
+        # Re-raise HTTPExceptions (já tratadas)
         raise
     except Exception as e_general:
-        print(f"DEBUG: Erro geral na autenticação: {e_general}")
+        print(f"DEBUG: Erro geral na validação do usuário: {e_general}")
         print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor"
+            detail="Erro interno de autenticação. Tente novamente."
         )
 
 

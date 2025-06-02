@@ -36,7 +36,6 @@ const unitOptions = [
   { value: 'PERCENTAGE', label: 'Porcentagem (%)', example: 'Ex: 85%' },
   { value: 'NUMBER', label: 'Número', example: 'Ex: 1000 usuários' },
   { value: 'CURRENCY', label: 'Moeda (R$)', example: 'Ex: R$ 50.000' },
-  { value: 'BINARY', label: 'Sim/Não', example: 'Ex: Concluído ou não' },
 ];
 
 const MetaForm: React.FC<MetaFormProps> = ({
@@ -108,11 +107,6 @@ const MetaForm: React.FC<MetaFormProps> = ({
       return;
     }
 
-    if (formData.unit === 'BINARY' && (formData.target_value !== 0 && formData.target_value !== 1)) {
-      toast.error('Para tipo Sim/Não, o valor meta deve ser 0 ou 1');
-      return;
-    }
-
     if (formData.unit === 'PERCENTAGE' && formData.target_value > 100) {
       toast.error('Para porcentagem, o valor meta não pode ser maior que 100%');
       return;
@@ -169,8 +163,6 @@ const MetaForm: React.FC<MetaFormProps> = ({
     switch (formData.unit) {
       case 'PERCENTAGE':
         return 100;
-      case 'BINARY':
-        return 1;
       default:
         return 999999;
     }
@@ -180,8 +172,6 @@ const MetaForm: React.FC<MetaFormProps> = ({
     switch (formData.unit) {
       case 'PERCENTAGE':
         return 0.01;
-      case 'BINARY':
-        return 1;
       case 'CURRENCY':
         return 0.01;
       default:

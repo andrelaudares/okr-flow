@@ -64,7 +64,8 @@ export interface MetaFilters {
 export type KeyResultFilters = MetaFilters;
 
 export interface MetasResponse {
-  metas: Meta[];
+  metas?: Meta[];  // Manter compatibilidade
+  key_results?: Meta[];  // Campo usado pela API atual
   total: number;
   has_more: boolean;
   filters_applied: MetaFilters;

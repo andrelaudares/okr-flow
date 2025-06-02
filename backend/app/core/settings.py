@@ -31,6 +31,39 @@ class Settings:
     # Configurações de Timeout
     TIMEOUT_KEEP_ALIVE: int = int(os.getenv("TIMEOUT_KEEP_ALIVE", "30"))
     TIMEOUT_GRACEFUL_SHUTDOWN: int = int(os.getenv("TIMEOUT_GRACEFUL_SHUTDOWN", "5"))
+    
+    # 🔑 Configurações de JWT - NOVO!
+    # Tempo de expiração do JWT em segundos (padrão: 30 dias)
+    JWT_EXPIRATION_TIME: int = int(os.getenv("JWT_EXPIRATION_TIME", str(30 * 24 * 3600)))  # 30 dias
+    
+    # Tempo de expiração do refresh token em segundos (padrão: 90 dias)  
+    JWT_REFRESH_EXPIRATION_TIME: int = int(os.getenv("JWT_REFRESH_EXPIRATION_TIME", str(90 * 24 * 3600)))  # 90 dias
+    
+    # Configurações de sessão - para controle adicional
+    SESSION_TIMEOUT: int = int(os.getenv("SESSION_TIMEOUT", str(24 * 3600)))  # 24 horas default
+    EXTEND_SESSION_ON_ACTIVITY: bool = os.getenv("EXTEND_SESSION_ON_ACTIVITY", "true").lower() == "true"
 
 # Instância global das configurações
 settings = Settings() 
+
+# Configurações específicas para ambientes
+def get_environment_config():
+    """Retorna configurações baseadas no ambiente"""
+    is_production = os.getenv("ENVIRONMENT") == "production"
+    
+    if is_production:
+        return {
+            "JWT_EXPIRATION_TIME": settings.JWT_EXPIRATION_TIME,
+            "JWT_REFRESH_EXPIRATION_TIME": settings.JWT_REFRESH_EXPIRATION_TIME,
+            "SESSION_TIMEOUT": settings.SESSION_TIMEOUT * 2,  # Dobrar em produção
+            "LOG_LEVEL": "WARNING",
+            "ENABLE_DEBUG_LOGS": False
+        }
+    else:
+        return {
+            "JWT_EXPIRATION_TIME": 7 * 24 * 3600,  # 7 dias em desenvolvimento
+            "JWT_REFRESH_EXPIRATION_TIME": 30 * 24 * 3600,  # 30 dias em desenvolvimento  
+            "SESSION_TIMEOUT": 8 * 3600,  # 8 horas em desenvolvimento
+            "LOG_LEVEL": "INFO",
+            "ENABLE_DEBUG_LOGS": True
+        } 

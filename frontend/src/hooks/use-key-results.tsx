@@ -103,7 +103,7 @@ export const useKeyResults = (objectiveId: string, filters: KeyResultFilters = {
 
   return {
     // Dados
-    keyResults: keyResultsData?.metas || [],
+    keyResults: keyResultsData?.key_results || [],
     total: keyResultsData?.total || 0,
     hasMore: keyResultsData?.has_more || false,
     filtersApplied: keyResultsData?.filters_applied || {},

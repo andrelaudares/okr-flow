@@ -21,8 +21,8 @@ import type { Objective, CreateObjectiveData, UpdateObjectiveData } from '@/type
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { isOwner, isAdmin } = usePermissions();
-  const canCreateObjective = isOwner || isAdmin;
+  const { isOwner, isAdmin, canCreateObjectives } = usePermissions();
+  const canCreateObjective = canCreateObjectives;
   
   const { filters, updateFilter, clearFilters, nextPage, prevPage } = useObjectiveFilters();
   const { 

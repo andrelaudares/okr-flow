@@ -1,13 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { Download, FileText, FileSpreadsheet, Loader2, CheckCircle } from 'lucide-react';
+import { Download, FileText, Loader2 } from 'lucide-react';
 import { useReports } from '@/hooks/reports/useReports';
 import { useObjectiveFilters } from '@/hooks/use-objectives';
 import { toast } from 'sonner';
@@ -30,15 +23,13 @@ const ExportButton: React.FC<ExportButtonProps> = ({
 }) => {
   const { exportReport, getReportStatus, downloadReport } = useReports();
   const { filters } = useObjectiveFilters();
-  const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportingFormat, setExportingFormat] = useState<string | null>(null);
 
-  const pollReportStatus = async (reportId: string, format: string) => {
+  const pollReportStatus = async (reportId: string) => {
     const maxAttempts = 30; // 30 tentativas = 30 segundos máximo
     let attempts = 0;
     
-    console.log(`Iniciando polling para relatório ${reportId} (formato: ${format})`);
+    console.log(`Iniciando polling para relatório ${reportId}`);
     
     const poll = async (): Promise<void> => {
       attempts++;
@@ -56,7 +47,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
           console.log(`Relatório ${reportId} concluído! Iniciando download...`);
           // Download automático
           await downloadReport(reportId);
-          toast.success(`Relatório ${format} baixado com sucesso!`);
+          toast.success(`Relatório PDF baixado com sucesso!`);
           return;
         }
         
@@ -84,27 +75,26 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     poll();
   };
 
-  const handleExport = async (format: 'CSV' | 'PDF') => {
-    console.log(`Iniciando exportação no formato ${format}`);
+  const handleExportPDF = async () => {
+    console.log(`Iniciando exportação PDF`);
     setIsExporting(true);
-    setExportingFormat(format);
     
     try {
       // Usar configuração personalizada se fornecida, senão usar configuração padrão do dashboard
       const config: ExportConfig = exportConfig ? {
         name: exportConfig.name || `Relatório - ${new Date().toLocaleDateString('pt-BR')}`,
         report_type: exportConfig.report_type || 'DASHBOARD',
-        format,
+        format: 'PDF',
         filters: {
           ...exportConfig.filters,
           include_key_results: exportConfig.filters?.include_key_results ?? true,
           include_checkins: exportConfig.filters?.include_checkins ?? true
         },
-        include_charts: format === 'PDF'
+        include_charts: true
       } : {
         name: `Relatório Dashboard - ${new Date().toLocaleDateString('pt-BR')}`,
         report_type: 'DASHBOARD',
-        format,
+        format: 'PDF',
         filters: {
           search: filters.search,
           status: filters.status,
@@ -113,7 +103,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
           include_key_results: true,
           include_checkins: true
         },
-        include_charts: format === 'PDF'
+        include_charts: true
       };
 
       console.log('Configuração do relatório:', config);
@@ -122,70 +112,42 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       console.log('ID do relatório retornado:', reportId);
       
       if (reportId) {
-        toast.success(`Gerando relatório ${format}... O download iniciará automaticamente.`);
+        toast.success(`Gerando relatório PDF... O download iniciará automaticamente.`);
         
         // Iniciar polling para verificar status e fazer download automático
-        await pollReportStatus(reportId, format);
+        await pollReportStatus(reportId);
       } else {
         throw new Error('Não foi possível obter o ID do relatório');
       }
       
     } catch (error) {
-      console.error('Erro ao exportar:', error);
-      toast.error('Erro ao gerar relatório');
+      console.error('Erro ao exportar PDF:', error);
+      toast.error('Erro ao gerar relatório PDF');
     } finally {
       setIsExporting(false);
-      setExportingFormat(null);
-      setIsOpen(false);
     }
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button 
-          variant={variant} 
-          size={size}
-          className={className}
-          disabled={isExporting}
-        >
-          {isExporting ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
-          )}
-          {isExporting ? `Gerando ${exportingFormat}...` : (customLabel || 'Exportar')}
-        </Button>
-      </DropdownMenuTrigger>
-      
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem 
-          onClick={() => handleExport('CSV')}
-          disabled={isExporting}
-          className="cursor-pointer"
-        >
-          <FileSpreadsheet className="h-4 w-4 mr-2" />
-          Exportar como CSV
-          {isExporting && exportingFormat === 'CSV' && (
-            <Loader2 className="h-3 w-3 ml-auto animate-spin" />
-          )}
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          onClick={() => handleExport('PDF')}
-          disabled={isExporting}
-          className="cursor-pointer"
-        >
+    <Button 
+      variant={variant} 
+      size={size}
+      className={className}
+      disabled={isExporting}
+      onClick={handleExportPDF}
+    >
+      {isExporting ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Gerando PDF...
+        </>
+      ) : (
+        <>
           <FileText className="h-4 w-4 mr-2" />
-          Exportar como PDF
-          {isExporting && exportingFormat === 'PDF' && (
-            <Loader2 className="h-3 w-3 ml-auto animate-spin" />
-          )}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {customLabel || 'Exportar PDF'}
+        </>
+      )}
+    </Button>
   );
 };
 

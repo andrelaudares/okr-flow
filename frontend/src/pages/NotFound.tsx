@@ -15,7 +15,7 @@ const NotFound = () => {
       <p className="text-gray-600 mb-8 max-w-md">
         We couldn't find the page you're looking for: <code className="text-sm bg-gray-100 p-1 rounded">{location.pathname}</code>
       </p>
-      <Button onClick={() => navigate('/')}>
+      <Button onClick={() => navigate('/Dashboard')}>
         Return to Home
       </Button>
     </div>

@@ -13,10 +13,12 @@ import Users from "./pages/Users";
 import Profile from "./pages/Profile";
 import Cycles from "./pages/cycles/Cycles";
 import ObjectiveKeyResults from "./pages/objectives/ObjectiveKeyResults";
+import Objectives from "./pages/objectives/Objectives";
 import CompanySettingsPage from "./pages/company/CompanySettings";
 import TestSimple from "./pages/TestSimple";
 import Navbar from "./components/layout/navbar";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import SessionExpiredModal from "./components/auth/SessionExpiredModal";
 import Index from './pages/Index';
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -31,10 +33,10 @@ const queryClient = new QueryClient({
 
 // This component must be used inside AuthProvider
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -57,70 +59,136 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-// This component must be used inside AuthProvider
-const AppRoutes = () => {
+// Componente para gerenciar modals globais
+const GlobalModals = () => {
+  const { 
+    isSessionExpired, 
+    isRefreshingToken, 
+    hideSessionExpiredModal, 
+    refreshSession 
+  } = useAuth();
+
+  const handleLogin = () => {
+    hideSessionExpiredModal();
+    window.location.href = '/login';
+  };
+
+  const handleRefresh = async () => {
+    const success = await refreshSession();
+    if (!success) {
+      // Se refresh falhou, redirecionar para login
+      handleLogin();
+    }
+  };
+
   return (
-    <Routes>
-      <Route path="/test" element={<TestSimple />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/reset-confirmation" element={<ResetConfirmation />} />
-      <Route path="/" element={<Index />} />
-      
-      <Route path="/dashboard" element={
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
-      } />
-      <Route path="/history" element={
-        <ProtectedRoute>
-          <History />
-        </ProtectedRoute>
-      } />
-      <Route path="/users" element={
-        <ProtectedRoute>
-          <Users />
-        </ProtectedRoute>
-      } />
-      <Route path="/profile" element={
-        <ProtectedRoute>
-          <Profile />
-        </ProtectedRoute>
-      } />
-      <Route path="/company-settings" element={
-        <ProtectedRoute>
-          <CompanySettingsPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/cycles" element={
-        <ProtectedRoute>
-          <Cycles />
-        </ProtectedRoute>
-      } />
-      <Route path="/objectives/:objectiveId/key-results" element={
-        <ProtectedRoute>
-          <ObjectiveKeyResults />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <SessionExpiredModal
+      open={isSessionExpired}
+      onLogin={handleLogin}
+      onRefresh={handleRefresh}
+      isRefreshing={isRefreshingToken}
+    />
   );
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            {/* Modals globais para controle de sessão */}
+            <GlobalModals />
+            
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/reset-confirmation" element={<ResetConfirmation />} />
+              
+              {/* Rotas protegidas */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <ProtectedRoute>
+                    <History />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute>
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cycles"
+                element={
+                  <ProtectedRoute>
+                    <Cycles />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/objectives"
+                element={
+                  <ProtectedRoute>
+                    <Objectives />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/objectives/:objectiveId/key-results"
+                element={
+                  <ProtectedRoute>
+                    <ObjectiveKeyResults />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/company-settings"
+                element={
+                  <ProtectedRoute>
+                    <CompanySettingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/test-simple"
+                element={
+                  <ProtectedRoute>
+                    <TestSimple />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </QueryClientProvider>
+  );
+}
 
 export default App;

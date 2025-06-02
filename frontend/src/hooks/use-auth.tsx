@@ -14,176 +14,219 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isSessionExpired: boolean;
+  isRefreshingToken: boolean;
+  sessionExpiresAt: number | null;
 }
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
   getCurrentUser: () => Promise<User | null>;
-  loading: boolean; // Adicionar propriedade loading
+  refreshSession: () => Promise<boolean>;
+  hideSessionExpiredModal: () => void;
+  checkSessionExpiry: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    token: null,
-    isLoading: true,
-    isAuthenticated: false,
-  });
-  
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [isRefreshingToken, setIsRefreshingToken] = useState(false);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<number | null>(null);
   const navigate = useNavigate();
 
-  // Verificar se há usuário armazenado ao inicializar
-  useEffect(() => {
-    const checkStoredAuth = async () => {
-      try {
-        const storedUser = localStorage.getItem("nobugOkrUser");
-        const storedToken = localStorage.getItem("nobugOkrToken");
-
-        if (storedUser && storedToken) {
-          const userData = JSON.parse(storedUser);
-          
-            setState({
-            user: userData,
-              token: storedToken,
-              isLoading: false,
-              isAuthenticated: true,
-            });
-            
-          console.log("Usuário autenticado:", userData.email);
-        } else {
-          console.log("Nenhum token armazenado encontrado");
-          setState(prev => ({
-            ...prev,
-            isLoading: false,
-          }));
+  const checkSessionExpiry = () => {
+    if (!sessionExpiresAt) return;
+    
+    const now = Date.now() / 1000;
+    const timeUntilExpiry = sessionExpiresAt - now;
+    
+    console.log(`🕐 Sessão expira em ${Math.round(timeUntilExpiry / 60)} minutos`);
+    
+    if (timeUntilExpiry < 1800 && timeUntilExpiry > 0) {
+      toast.warning('Sessão Expirando', {
+        description: `Sua sessão expira em ${Math.round(timeUntilExpiry / 60)} minutos.`,
+        action: {
+          label: 'Renovar',
+          onClick: refreshSession
         }
-      } catch (error) {
-        console.error("Erro ao verificar autenticação:", error);
-        // Em caso de erro, limpar dados e definir como não autenticado
-        clearTokens();
-        setState({
-          user: null,
-          token: null,
-          isLoading: false,
-          isAuthenticated: false,
-        });
-      }
-    };
+      });
+    }
+  };
 
-    checkStoredAuth();
-  }, []);
+  useEffect(() => {
+    if (!sessionExpiresAt) return;
+    
+    const interval = setInterval(() => {
+      checkSessionExpiry();
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [sessionExpiresAt]);
+
+  const refreshSession = async (): Promise<boolean> => {
+    setIsRefreshingToken(true);
+    
+    try {
+      const refreshToken = localStorage.getItem('nobugOkrRefreshToken');
+      if (!refreshToken) {
+        throw new Error('Nenhum refresh token disponível');
+      }
+
+      console.log('🔄 Tentando renovar sessão...');
+      
+      const response = await api.post('/api/auth/refresh', {
+        refresh_token: refreshToken
+      });
+
+      const authData: AuthResponse = response.data;
+      
+      setTokens(authData.access_token, authData.refresh_token);
+      
+      setToken(authData.access_token);
+      setUser(authData.user);
+      setSessionExpiresAt(authData.user.expires_at);
+      setIsSessionExpired(false);
+      
+      console.log('✅ Sessão renovada com sucesso');
+      toast.success('Sessão renovada automaticamente');
+      
+      return true;
+    } catch (error: any) {
+      console.log('❌ Falha ao renovar sessão:', error);
+      
+      clearTokens();
+      setUser(null);
+      setToken(null);
+      setSessionExpiresAt(null);
+      setIsSessionExpired(true);
+      
+      return false;
+    } finally {
+      setIsRefreshingToken(false);
+    }
+  };
+
+  const hideSessionExpiredModal = () => {
+    setIsSessionExpired(false);
+  };
 
   const login = async (credentials: LoginCredentials) => {
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      setIsLoading(true);
       
-      // Enviar dados no formato esperado pelo backend (JSON simples)
-      const response = await api.post<AuthResponse>('/api/auth/login', {
-        email: credentials.email,
-        password: credentials.password,
-      });
-
-      const { access_token, token_type, user } = response.data;
+      const response = await api.post('/api/auth/login', credentials);
+      const authData: AuthResponse = response.data;
       
-      // Armazenar tokens e usuário
-      setTokens(access_token);
-      localStorage.setItem("nobugOkrUser", JSON.stringify(user));
+      console.log(`🔑 Login realizado - Token expira em ${authData.expires_in / (24*3600)} dias`);
       
-      setState({
-        user,
-        token: access_token,
-        isLoading: false,
-        isAuthenticated: true,
-      });
+      setTokens(authData.access_token, authData.refresh_token);
       
-      toast.success(`Bem-vindo, ${user.name}!`);
-      console.log('Login realizado com sucesso:', user.email);
+      setToken(authData.access_token);
+      setUser(authData.user);
+      setSessionExpiresAt(authData.user.expires_at);
+      setIsSessionExpired(false);
+      
+      localStorage.setItem('nobugOkrUser', JSON.stringify(authData.user));
+      
+      toast.success(`Bem-vindo, ${authData.user.name}!`);
       navigate('/dashboard');
-      
     } catch (error: any) {
-      setState(prev => ({ ...prev, isLoading: false }));
-      console.error('Erro no login:', error);
-      
-      // Erro já é tratado pelo interceptor da API
+      const errorMessage = error.response?.data?.detail || 'Erro ao fazer login';
+      toast.error(errorMessage);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const register = async (data: RegisterData) => {
     try {
-      setState(prev => ({ ...prev, isLoading: true }));
+      setIsLoading(true);
       
-      // Enviar dados no formato esperado pelo backend UserRegister
-      const response = await api.post('/api/auth/register', {
-        name: data.name,
-        email: data.email,
-        password: data.password,
-        username: data.email, // Usar email como username por enquanto
-        cpf_cnpj: data.cpf_cnpj || '000.000.000-00', // Campo obrigatório no backend
-      });
-
-      const responseData = response.data;
+      const response = await api.post('/api/auth/register', data);
+      const authData: AuthResponse = response.data;
       
-      setState(prev => ({ ...prev, isLoading: false }));
+      setTokens(authData.access_token, authData.refresh_token);
       
-      // Mostrar popup de sucesso com informações de aprovação
-      toast.success(
-        responseData.message || 'Cadastro realizado! Aguarde aprovação em até 48 horas.',
-        {
-          duration: 8000, // 8 segundos para dar tempo de ler
-          description: 'Você receberá um email quando seu acesso for liberado.'
-        }
-      );
+      setToken(authData.access_token);
+      setUser(authData.user);
+      setSessionExpiresAt(authData.user.expires_at);
       
-      console.log('Registro realizado com sucesso:', responseData);
+      localStorage.setItem('nobugOkrUser', JSON.stringify(authData.user));
       
-      // Redirecionar para login pois registro requer aprovação
-      navigate('/login');
-      
+      toast.success(`Conta criada com sucesso! Bem-vindo, ${authData.user.name}!`);
+      navigate('/dashboard');
     } catch (error: any) {
-      setState(prev => ({ ...prev, isLoading: false }));
-      console.error('Erro no registro:', error);
-      
-      // Erro já é tratado pelo interceptor da API
+      const errorMessage = error.response?.data?.detail || 'Erro ao criar conta';
+      toast.error(errorMessage);
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const logout = async () => {
-    try {
-      // Fazer logout no backend
-      await api.post('/api/auth/logout');
-    } catch (error) {
-      console.error('Erro ao fazer logout no backend:', error);
-      // Continuar com logout local mesmo se falhar no backend
-    } finally {
-      // Limpar dados locais
-      clearTokens();
-      
-      setState({
-        user: null,
-        token: null,
-        isLoading: false,
-        isAuthenticated: false,
-      });
-      
-      toast.success('Logout realizado com sucesso');
-      navigate('/login');
-    }
+  const logout = () => {
+    api.post('/api/auth/logout').catch(() => {
+    });
+    
+    clearTokens();
+    setUser(null);
+    setToken(null);
+    setSessionExpiresAt(null);
+    setIsSessionExpired(false);
+    
+    toast.success('Logout realizado com sucesso');
+    navigate('/login');
   };
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const storedToken = localStorage.getItem('nobugOkrToken');
+        const storedUser = localStorage.getItem('nobugOkrUser');
+        
+        if (storedToken && storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            
+            if (userData.expires_at && userData.expires_at < Date.now() / 1000) {
+              console.log('🔑 Token armazenado expirado, tentando refresh...');
+              const refreshed = await refreshSession();
+              if (!refreshed) {
+                throw new Error('Refresh falhou');
+              }
+            } else {
+              setToken(storedToken);
+              setUser(userData);
+              setSessionExpiresAt(userData.expires_at);
+            }
+          } catch (parseError) {
+            console.log('❌ Erro ao verificar token armazenado:', parseError);
+            clearTokens();
+          }
+        }
+      } catch (error) {
+        console.log('❌ Erro na verificação de autenticação:', error);
+        clearTokens();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
 
   const getCurrentUser = async (): Promise<User | null> => {
     try {
       const response = await api.get<User>('/api/auth/me');
       
-      setState(prev => ({
-        ...prev,
-        user: response.data,
-      }));
+      setUser(response.data);
       
       return response.data;
     } catch (error) {
@@ -193,12 +236,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const value: AuthContextType = {
-    ...state,
+    user,
+    token,
+    isLoading,
+    isAuthenticated: !!user && !!token,
+    isSessionExpired,
+    isRefreshingToken,
+    sessionExpiresAt,
     login,
     register,
     logout,
     getCurrentUser,
-    loading: state.isLoading, // Mapear isLoading para loading
+    refreshSession,
+    hideSessionExpiredModal,
+    checkSessionExpiry,
   };
 
   return (
@@ -216,16 +267,19 @@ export const useAuth = () => {
   return context;
 };
 
-// Hook para verificar permissões
 export const usePermissions = () => {
   const { user } = useAuth();
-  
+
   return {
+    canManageUsers: user?.is_owner || user?.role === 'ADMIN',
+    canManageCompany: user?.is_owner,
+    canCreateCycles: user?.is_owner || user?.role === 'ADMIN',
+    canManageTeams: user?.is_owner || user?.role === 'ADMIN',
+    canCreateObjectives: user?.is_owner || user?.role === 'ADMIN' || user?.role === 'MANAGER',
+    canCreateKeyResults: user?.is_owner || user?.role === 'ADMIN' || user?.role === 'MANAGER',
     isOwner: user?.is_owner || false,
-    isAdmin: user?.role === 'ADMIN' || user?.is_owner || false,
-    isManager: user?.role === 'MANAGER' || user?.role === 'ADMIN' || user?.is_owner || false,
-    canManageUsers: user?.role === 'ADMIN' || user?.is_owner || false,
-    canManageCompany: user?.is_owner || false,
-    canCreateObjectives: user?.role !== 'COLLABORATOR' || user?.is_owner || false,
+    isAdmin: user?.role === 'ADMIN',
+    isManager: user?.role === 'MANAGER',
+    isCollaborator: user?.role === 'COLLABORATOR',
   };
 };

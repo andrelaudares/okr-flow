@@ -2,9 +2,10 @@ import csv
 import io
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from uuid import uuid4
+from io import BytesIO
 
 try:
     import pandas as pd
@@ -648,7 +649,7 @@ class ReportGenerator:
                             last_checkin = recent_checkins[0]
                             if 'checkin_date' in last_checkin:
                                 try:
-                                    last_checkin_date = datetime.fromisoformat(last_checkin['checkin_date'].replace('Z', '+00:00'))
+                                    last_checkin_date = safe_parse_datetime(last_checkin['checkin_date'])
                                 except:
                                     pass
                         
@@ -658,14 +659,14 @@ class ReportGenerator:
                         
                         if kr.get('created_at'):
                             try:
-                                created_date = datetime.fromisoformat(kr['created_at'].replace('Z', '+00:00'))
+                                created_date = safe_parse_datetime(kr['created_at'])
                                 created_at_str = created_date.strftime('%d/%m/%Y')
                             except:
                                 pass
                         
                         if kr.get('updated_at'):
                             try:
-                                updated_date = datetime.fromisoformat(kr['updated_at'].replace('Z', '+00:00'))
+                                updated_date = safe_parse_datetime(kr['updated_at'])
                                 updated_at_str = updated_date.strftime('%d/%m/%Y')
                             except:
                                 pass
@@ -739,7 +740,7 @@ class ReportGenerator:
                                 checkin_date_str = 'N/A'
                                 if checkin.get('checkin_date'):
                                     try:
-                                        checkin_date = datetime.fromisoformat(checkin['checkin_date'].replace('Z', '+00:00'))
+                                        checkin_date = safe_parse_datetime(checkin['checkin_date'])
                                         checkin_date_str = checkin_date.strftime('%d/%m/%Y')
                                     except:
                                         pass
@@ -1118,4 +1119,32 @@ class ReportGenerator:
                 return True
             return False
         except OSError:
-            return False 
+            return False
+
+def safe_parse_datetime(date_string: str) -> datetime:
+    """
+    Função helper para parser seguro de datas ISO que podem ter microssegundos com muitos dígitos
+    """
+    if not date_string:
+        return datetime.now()
+    
+    try:
+        # Remover Z e adicionar timezone UTC
+        clean_date = date_string.replace('Z', '+00:00')
+        
+        # Se tem microssegundos com mais de 6 dígitos, truncar para 6
+        if '.' in clean_date and '+' in clean_date:
+            parts = clean_date.split('+')
+            date_part = parts[0]
+            tz_part = '+' + parts[1]
+            
+            if '.' in date_part:
+                main_part, microsec_part = date_part.split('.')
+                # Truncar microssegundos para 6 dígitos
+                microsec_part = microsec_part[:6].ljust(6, '0')
+                clean_date = f"{main_part}.{microsec_part}{tz_part}"
+        
+        return datetime.fromisoformat(clean_date)
+    except Exception as e:
+        print(f"DEBUG: Erro ao parser data '{date_string}': {e}")
+        return datetime.now() 

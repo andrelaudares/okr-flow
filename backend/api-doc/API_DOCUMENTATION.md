@@ -6,6 +6,7 @@ Backend para sistema de gestão de OKRs (Objectives and Key Results) com autenti
 **Versão**: 1.0.0  
 **Sprint Atual**: Sprint 8 - Sistema de Histórico e Analytics  
 **Base URL**: `http://localhost:8000`
+ python -m app.main
 
 python start_server.py --host 127.0.0.1 --port 8000
 

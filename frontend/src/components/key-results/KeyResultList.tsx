@@ -34,8 +34,8 @@ const MetaList: React.FC<MetaListProps> = ({
   objectiveId,
   objectiveTitle,
 }) => {
-  const { isOwner, isAdmin } = usePermissions();
-  const canCreateMeta = isOwner || isAdmin;
+  const { isOwner, isAdmin, canCreateKeyResults } = usePermissions();
+  const canCreateMeta = canCreateKeyResults;
   
   const { 
     keyResults: metas, 

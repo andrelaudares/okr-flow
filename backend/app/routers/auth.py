@@ -1,17 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from supabase import Client
 import requests
 from fastapi.security import OAuth2PasswordBearer
 from postgrest.exceptions import APIError
-from uuid import uuid4
+from uuid import uuid4, UUID
 import traceback
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
+import os
+import time
+from typing import Optional
 
-from ..models.user import UserRegister, UserLogin, UserProfile, UserRegisterResponse
+from ..models.user import UserRegister, UserLogin, UserProfile, UserRegisterResponse, UserCreate, UserRole
+from ..models.session import UserSessionsResponse, RevokeSessionRequest
+from ..services.token_service import TokenService
 from ..utils.supabase import supabase_client, supabase_admin
 from ..utils.asaas import asaas_request, create_asaas_customer
 from ..dependencies import get_current_user
+from ..core.settings import settings, get_environment_config
 
 router = APIRouter()
 
@@ -22,6 +28,22 @@ class UpdatePasswordRequest(BaseModel):
     access_token: str
     refresh_token: str
     new_password: str
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    refresh_token: str
+    user: dict
+
+class UserRegistration(BaseModel):
+    """Dados de registro de usuário"""
+    email: EmailStr = Field(..., description="Email válido")
+    password: str = Field(..., min_length=6, description="Senha com no mínimo 6 caracteres")
+    username: str = Field(..., min_length=3, max_length=50, description="Nome de usuário único")
+    name: str = Field(..., min_length=2, max_length=100, description="Nome completo")
+    company_name: str = Field(..., min_length=2, max_length=100, description="Nome da empresa")
+    cpf_cnpj: str = Field(..., min_length=11, max_length=18, description="CPF ou CNPJ")
 
 def check_supabase_config():
     """Verifica se o Supabase está configurado"""
@@ -187,29 +209,43 @@ async def register_user(user_data: UserRegister):
         print(f"DEBUG: Stack trace: {traceback.format_exc()}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro interno: {str(e_general)}")
 
-@router.post("/login", summary="Realiza login e retorna tokens")
-async def login_user(user_data: UserLogin):
+@router.post("/login", response_model=AuthResponse, summary="Realiza login e retorna tokens")
+async def login_user(user_data: UserLogin, request: Request):
     """
-    Autentica usuário e retorna token JWT com expiração longa.
-    Verifica se usuário está ativo antes de permitir login.
+    Autentica usuário e retorna token JWT com expiração MUITO longa (30 dias em produção).
+    Agora com controle avançado de sessões no banco de dados.
     """
     check_supabase_config()
     
     try:
         print(f"DEBUG: Tentativa de login para: {user_data.email}")
         
-        # Fazer login no Supabase Auth
+        # Obter configurações de ambiente
+        env_config = get_environment_config()
+        jwt_expiration = env_config["JWT_EXPIRATION_TIME"]
+        
+        print(f"DEBUG: JWT configurado para expirar em {jwt_expiration // (24*3600)} dias")
+        
+        # Fazer login no Supabase Auth com configuração personalizada
         try:
+            # Tentativa de login padrão
             auth_response = supabase_client.auth.sign_in_with_password({
                 "email": user_data.email,
                 "password": user_data.password
             })
+            
+            if not auth_response.session:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Credenciais inválidas. Verifique seu email e senha."
+                )
+                
         except Exception as e_auth:
             print(f"DEBUG: Erro no Supabase Auth login: {e_auth}")
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
-        
-        if not auth_response.session:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Credenciais inválidas. Verifique seu email e senha."
+            )
 
         # Verificar se usuário existe na tabela users
         try:
@@ -218,15 +254,20 @@ async def login_user(user_data: UserLogin):
             if not user_check.data:
                 # Se usuário não existe na tabela users, fazer logout do Auth
                 supabase_client.auth.sign_out()
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado no sistema")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Usuário não encontrado no sistema. Entre em contato com o administrador."
+                )
             
             user_profile = user_check.data[0]
             
-            # Removemos a verificação de is_active para permitir login de usuários inativos
-            # if not user_profile.get('is_active', True):
-            #     # Fazer logout do usuário se estiver inativo
-            #     supabase_client.auth.sign_out()
-            #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário desativado. Entre em contato com o administrador.")
+            # Verificar se usuário está ativo (removido temporariamente para debug)
+            if not user_profile.get('is_active', True):
+                supabase_client.auth.sign_out()
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED, 
+                    detail="Usuário desativado. Entre em contato com o administrador."
+                )
                 
         except HTTPException:
             raise
@@ -234,40 +275,91 @@ async def login_user(user_data: UserLogin):
             print(f"DEBUG: Erro ao verificar usuário na tabela: {e_user_check}")
             # Se não conseguir verificar, invalidar sessão por segurança
             supabase_client.auth.sign_out()
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro interno ao verificar usuário")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                detail="Erro interno ao verificar usuário. Tente novamente."
+            )
 
         print(f"DEBUG: Login bem-sucedido para: {user_data.email}")
-        print(f"DEBUG: Token de acesso gerado com expiração longa")
+        print(f"DEBUG: Token gerado com expiração de {jwt_expiration // (24*3600)} dias")
         
-        return {
-            "access_token": auth_response.session.access_token,
-            "token_type": "bearer",
-            "refresh_token": auth_response.session.refresh_token,
-            "user": {
+        # Calcular tempo de expiração
+        expires_at = int(time.time()) + jwt_expiration
+        
+        # 🔒 NOVO: Criar sessão no banco de dados
+        try:
+            # Obter informações da requisição
+            client_ip = request.client.host if request.client else None
+            user_agent = request.headers.get("User-Agent")
+            
+            # Criar sessão usando TokenService
+            session = await TokenService.create_session(
+                user_id=UUID(user_profile["id"]),
+                access_token=auth_response.session.access_token,
+                refresh_token=auth_response.session.refresh_token,
+                ip_address=client_ip,
+                user_agent=user_agent,
+                expires_in_seconds=jwt_expiration
+            )
+            
+            print(f"DEBUG: Sessão criada no banco: {session.id}")
+            
+        except Exception as e_session:
+            print(f"DEBUG: Erro ao criar sessão no banco (não crítico): {e_session}")
+            # Continuar mesmo se sessão no banco falhar
+        
+        return AuthResponse(
+            access_token=auth_response.session.access_token,
+            token_type="bearer",
+            expires_in=jwt_expiration,  # Retornar tempo em segundos
+            refresh_token=auth_response.session.refresh_token,
+            user={
                 "id": user_profile["id"],
                 "email": user_profile["email"],
                 "name": user_profile["name"],
                 "role": user_profile["role"],
                 "is_owner": user_profile["is_owner"],
-                "company_id": user_profile["company_id"]
+                "company_id": user_profile["company_id"],
+                "expires_at": expires_at  # Timestamp de expiração
             }
-        }
+        )
         
     except HTTPException:
         raise
     except Exception as e:
         print(f"DEBUG: Erro no login: {e}")
         print(f"DEBUG: Stack trace: {traceback.format_exc()}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Erro interno do servidor")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail="Erro interno do servidor. Tente novamente em alguns instantes."
+        )
 
-@router.post("/logout", summary="Realiza logout (invalida a sessão no Supabase)")
-async def logout_user(current_user: UserProfile = Depends(get_current_user)):
+@router.post("/logout", summary="Realiza logout (invalida a sessão no Supabase e revoga no banco)")
+async def logout_user(request: Request, current_user: UserProfile = Depends(get_current_user)):
     """
-    Invalida a sessão atual do usuário.
+    Invalida a sessão atual do usuário e revoga no banco de dados.
     """
     check_supabase_config()
     
     try:
+        print(f"DEBUG: Logout para usuário: {current_user.email}")
+        
+        # 🔒 NOVO: Revogar sessão no banco de dados
+        try:
+            # Obter token atual do header
+            auth_header = request.headers.get("Authorization", "")
+            current_token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+            
+            if current_token:
+                # Buscar e revogar sessão no banco
+                session = await TokenService.validate_access_token(current_token, update_last_used=False)
+                if session:
+                    await TokenService.revoke_session(session.id, reason="manual_logout")
+                    print(f"DEBUG: Sessão {session.id} revogada no banco")
+                
+        except Exception as e_session:
+            print(f"DEBUG: Erro ao revogar sessão no banco (não crítico): {e_session}")
+        
         # Usar o cliente global para logout
         supabase_client.auth.sign_out()
         return {"message": "Logout realizado com sucesso"}
@@ -276,30 +368,101 @@ async def logout_user(current_user: UserProfile = Depends(get_current_user)):
         # Não é crítico se logout falhar
         return {"message": "Logout realizado com sucesso"}
 
-@router.post("/refresh", summary="Refresh do token de acesso")
-async def refresh_token(refresh_token: str):
+@router.post("/refresh", response_model=AuthResponse, summary="Refresh do token de acesso com controle no banco")
+async def refresh_token(refresh_data: dict, request: Request):
     """
-    Gera novo token de acesso usando refresh token.
+    Gera novo token de acesso usando refresh token com controle avançado no banco.
     """
     check_supabase_config()
     
     try:
+        refresh_token = refresh_data.get("refresh_token")
+        if not refresh_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Refresh token é obrigatório"
+            )
+        
+        print(f"DEBUG: Tentativa de refresh token")
+        
+        # Tentar refresh da sessão
         auth_response = supabase_client.auth.refresh_session(refresh_token)
         
         if not auth_response.session:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, 
+                detail="Refresh token inválido ou expirado. Faça login novamente."
+            )
         
-        return {
-            "access_token": auth_response.session.access_token,
-            "token_type": "bearer",
-            "refresh_token": auth_response.session.refresh_token
-        }
+        # Obter dados do usuário para incluir na resposta
+        try:
+            user_response = supabase_client.auth.get_user(auth_response.session.access_token)
+            if user_response.user:
+                user_check = supabase_admin.from_('users').select("*").eq('email', user_response.user.email).execute()
+                if user_check.data:
+                    user_profile = user_check.data[0]
+                else:
+                    user_profile = {"id": user_response.user.id, "email": user_response.user.email}
+            else:
+                user_profile = {}
+        except:
+            user_profile = {}
+        
+        # Obter configurações de ambiente para expiração
+        env_config = get_environment_config()
+        jwt_expiration = env_config["JWT_EXPIRATION_TIME"]
+        expires_at = int(time.time()) + jwt_expiration
+        
+        # 🔒 NOVO: Atualizar sessão no banco de dados
+        try:
+            refresh_response = await TokenService.refresh_session(
+                refresh_token=refresh_token,
+                new_access_token=auth_response.session.access_token,
+                new_refresh_token=auth_response.session.refresh_token
+            )
+            
+            if refresh_response:
+                print(f"DEBUG: Sessão atualizada no banco com sucesso")
+            else:
+                print(f"DEBUG: Sessão não encontrada no banco, criando nova...")
+                # Se não encontrou no banco, criar nova sessão
+                if user_profile and user_profile.get("id"):
+                    client_ip = request.client.host if request.client else None
+                    user_agent = request.headers.get("User-Agent")
+                    
+                    await TokenService.create_session(
+                        user_id=UUID(user_profile["id"]),
+                        access_token=auth_response.session.access_token,
+                        refresh_token=auth_response.session.refresh_token,
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        expires_in_seconds=jwt_expiration
+                    )
+            
+        except Exception as e_session:
+            print(f"DEBUG: Erro ao atualizar sessão no banco (não crítico): {e_session}")
+        
+        print(f"DEBUG: Token refreshed com sucesso, expira em {jwt_expiration // (24*3600)} dias")
+        
+        return AuthResponse(
+            access_token=auth_response.session.access_token,
+            token_type="bearer",
+            expires_in=jwt_expiration,
+            refresh_token=auth_response.session.refresh_token,
+            user={
+                **user_profile,
+                "expires_at": expires_at
+            }
+        )
         
     except HTTPException:
         raise
     except Exception as e:
         print(f"DEBUG: Erro no refresh: {e}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Erro ao renovar token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Erro ao renovar sessão. Faça login novamente."
+        )
 
 @router.get("/me", summary="Dados do usuário logado")
 async def get_current_user_data(current_user: UserProfile = Depends(get_current_user)):
@@ -381,4 +544,137 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
         raise
     except Exception as e:
         print(f"DEBUG: Erro ao atualizar senha: {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha. Tokens podem estar inválidos ou expirados.") 
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha. Tokens podem estar inválidos ou expirados.")
+
+# 🔒 NOVOS ENDPOINTS PARA GERENCIAMENTO DE SESSÕES
+
+@router.get("/sessions", response_model=UserSessionsResponse, summary="Listar sessões ativas do usuário")
+async def list_user_sessions(
+    request: Request,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Lista todas as sessões ativas do usuário atual.
+    Inclui informações sobre dispositivos, localização e tempo de uso.
+    """
+    try:
+        # Obter token atual do header
+        auth_header = request.headers.get("Authorization", "")
+        current_token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+        
+        sessions_response = await TokenService.get_user_sessions(
+            user_id=current_user.id,
+            current_token=current_token
+        )
+        
+        return sessions_response
+        
+    except Exception as e:
+        print(f"DEBUG: Erro ao listar sessões: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno ao buscar sessões"
+        )
+
+@router.post("/sessions/{session_id}/revoke", summary="Revogar sessão específica")
+async def revoke_session(
+    session_id: str,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Revoga uma sessão específica do usuário.
+    Útil para fazer logout de dispositivos específicos.
+    """
+    try:
+        success = await TokenService.revoke_session(
+            session_id=UUID(session_id),  # Convert string to UUID
+            reason="manual_revoke"
+        )
+        
+        if success:
+            return {"message": "Sessão revogada com sucesso"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sessão não encontrada ou já revogada"
+            )
+            
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ID de sessão inválido"
+        )
+    except Exception as e:
+        print(f"DEBUG: Erro ao revogar sessão: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno ao revogar sessão"
+        )
+
+@router.post("/sessions/revoke-all", summary="Revogar todas as outras sessões")
+async def revoke_all_sessions(
+    request: Request,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Revoga todas as sessões do usuário, exceto a atual.
+    Útil para fazer logout de todos os outros dispositivos.
+    """
+    try:
+        # Obter token atual
+        auth_header = request.headers.get("Authorization", "")
+        current_token = auth_header.replace("Bearer ", "") if auth_header.startswith("Bearer ") else None
+        
+        # Identificar sessão atual para não revogar
+        current_session_id = None
+        if current_token:
+            current_session = await TokenService.validate_access_token(current_token, update_last_used=False)
+            if current_session:
+                current_session_id = current_session.id
+        
+        revoked_count = await TokenService.revoke_user_sessions(
+            user_id=current_user.id,
+            except_session_id=current_session_id,
+            reason="logout_all_others"
+        )
+        
+        return {
+            "message": f"{revoked_count} sessões foram revogadas com sucesso",
+            "revoked_count": revoked_count
+        }
+        
+    except Exception as e:
+        print(f"DEBUG: Erro ao revogar todas as sessões: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno ao revogar sessões"
+        )
+
+@router.post("/cleanup-expired", summary="Limpar sessões expiradas (Admin)")
+async def cleanup_expired_sessions(
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Remove sessões expiradas do banco de dados.
+    Disponível apenas para administradores.
+    """
+    if not current_user.is_owner and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem executar limpeza."
+        )
+    
+    try:
+        cleaned_count = await TokenService.cleanup_expired_sessions(older_than_days=7)
+        
+        return {
+            "message": f"{cleaned_count} sessões expiradas foram removidas",
+            "cleaned_count": cleaned_count
+        }
+        
+    except Exception as e:
+        print(f"DEBUG: Erro na limpeza de sessões: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno na limpeza de sessões"
+        ) 

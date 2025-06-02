@@ -19,6 +19,7 @@ export interface User {
   description?: string;
   created_at: string;
   updated_at?: string;
+  expires_at?: number;
 }
 
 // Credenciais de login
@@ -46,6 +47,7 @@ export interface AuthResponse {
   token_type: string;
   refresh_token?: string;
   user: User;
+  expires_in?: number;
 }
 
 // Resposta de registro
