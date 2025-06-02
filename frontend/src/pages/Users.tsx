@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +37,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useAuth, usePermissions } from '@/hooks/use-auth';
 import { useUsers } from '@/hooks/use-users';
 import { toast } from 'sonner';
@@ -72,6 +83,14 @@ const Users = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Effect para detectar que estamos no cliente (fix SSR)
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Aplicar filtros
   const handleSearch = () => {
@@ -89,7 +108,7 @@ const Users = () => {
     clearFilters();
   };
 
-  const handleDeleteUser = async (user: User) => {
+  const handleDeleteUser = (user: User) => {
     if (!canManageUsers) {
       toast.error('Você não tem permissão para excluir usuários.');
       return;
@@ -105,13 +124,20 @@ const Users = () => {
       return;
     }
 
-    if (window.confirm(`Tem certeza que deseja desativar o usuário ${user.name}?`)) {
-      try {
-        deleteUser(user.id);
-        toast.success(`Usuário ${user.name} foi desativado.`);
-      } catch (error) {
-        console.error('Delete user error:', error);
-      }
+    setUserToDelete(user);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    try {
+      await deleteUser(userToDelete.id);
+      toast.success(`Usuário ${userToDelete.name} foi desativado.`);
+      setShowDeleteDialog(false);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error('Delete user error:', error);
     }
   };
 
@@ -144,6 +170,23 @@ const Users = () => {
         return role;
     }
   };
+
+  // Loading inicial enquanto não está no cliente
+  if (!isClient) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isError) {
     return (
@@ -266,7 +309,7 @@ const Users = () => {
       </Card>
 
       {/* Lista de Usuários */}
-          <Card>
+      <Card>
         <CardHeader>
           <CardTitle>Membros da Equipe ({total})</CardTitle>
           <CardDescription>
@@ -377,8 +420,8 @@ const Users = () => {
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
-        </div>
-      </div>
+                </div>
+              </div>
               )}
             </>
           )}
@@ -405,6 +448,34 @@ const Users = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar Usuário</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja desativar o usuário <strong>{userToDelete?.name}</strong>?
+              Esta ação pode ser revertida posteriormente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDeleteDialog(false);
+              setUserToDelete(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteUser}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Desativando...' : 'Desativar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

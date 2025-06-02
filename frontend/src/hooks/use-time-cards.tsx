@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { TimeCard, TimeCardsResponse, UpdateTimePreferencesData, AvailableCard } from '@/types/time-cards';
@@ -9,6 +10,16 @@ const CYCLE_PREFERENCES_KEY = 'nobug_okr_cycle_preferences';
 // Hook para gestão dos cards temporais
 export const useTimeCards = () => {
   const queryClient = useQueryClient();
+  
+  // Estado para controlar se está no cliente (fix para SSR)
+  const [isClient, setIsClient] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
+
+  // Effect para verificar se está no cliente e se tem token
+  useEffect(() => {
+    setIsClient(true);
+    setHasToken(!!localStorage.getItem('nobugOkrToken'));
+  }, []);
 
   // Query para buscar cards temporais
   const {
@@ -22,12 +33,14 @@ export const useTimeCards = () => {
       const response = await api.get('/api/dashboard/time-cards');
       return response.data;
     },
-    enabled: !!localStorage.getItem('nobugOkrToken'),
+    enabled: isClient && hasToken, // Só executa no cliente e com token
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
   // Funções para gerenciar preferências de ciclos localmente
   const getLocalCyclePreferences = (): string[] => {
+    if (!isClient) return []; // Retorna array vazio se não estiver no cliente
+    
     try {
       const stored = localStorage.getItem(CYCLE_PREFERENCES_KEY);
       return stored ? JSON.parse(stored) : [];
@@ -37,6 +50,8 @@ export const useTimeCards = () => {
   };
 
   const setLocalCyclePreferences = (cycleIds: string[]) => {
+    if (!isClient) return; // Não faz nada se não estiver no cliente
+    
     try {
       localStorage.setItem(CYCLE_PREFERENCES_KEY, JSON.stringify(cycleIds));
     } catch (error) {

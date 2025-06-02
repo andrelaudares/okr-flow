@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { Cycle, CreateCycleData, UpdateCycleData } from '@/types/cycles';
@@ -6,6 +7,16 @@ import type { Cycle, CreateCycleData, UpdateCycleData } from '@/types/cycles';
 // Hook para gestão de ciclos
 export const useCycles = () => {
   const queryClient = useQueryClient();
+  
+  // Estado para controlar se está no cliente (fix para SSR)
+  const [isClient, setIsClient] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
+
+  // Effect para verificar se está no cliente e se tem token
+  useEffect(() => {
+    setIsClient(true);
+    setHasToken(!!localStorage.getItem('nobugOkrToken'));
+  }, []);
 
   // Query para listar ciclos
   const {
@@ -19,7 +30,7 @@ export const useCycles = () => {
       const response = await api.get('/api/cycles/');
       return response.data;
     },
-    enabled: !!localStorage.getItem('nobugOkrToken'),
+    enabled: isClient && hasToken, // Só executa no cliente e com token
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
@@ -41,7 +52,7 @@ export const useCycles = () => {
         throw error;
       }
     },
-    enabled: !!localStorage.getItem('nobugOkrToken'),
+    enabled: isClient && hasToken, // Só executa no cliente e com token
     staleTime: 5 * 60 * 1000,
   });
 
@@ -53,7 +64,7 @@ export const useCycles = () => {
         const response = await api.get(`/api/cycles/${cycleId}`);
         return response.data;
       },
-      enabled: !!cycleId,
+      enabled: !!cycleId && isClient && hasToken,
     });
   };
 

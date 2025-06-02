@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import type { 
@@ -17,6 +17,16 @@ export const useUsers = () => {
     limit: 10,
     offset: 0,
   });
+  
+  // Estado para controlar se está no cliente (fix para SSR)
+  const [isClient, setIsClient] = useState(false);
+  const [hasToken, setHasToken] = useState(false);
+
+  // Effect para verificar se está no cliente e se tem token
+  useEffect(() => {
+    setIsClient(true);
+    setHasToken(!!localStorage.getItem('nobugOkrToken'));
+  }, []);
 
   // Query para listar usuários
   const {
@@ -38,7 +48,7 @@ export const useUsers = () => {
       const response = await api.get(`/api/users?${params.toString()}`);
       return response.data;
     },
-    enabled: !!localStorage.getItem('nobugOkrToken'),
+    enabled: isClient && hasToken, // Só executa no cliente e com token
     staleTime: 5 * 60 * 1000, // 5 minutos
   });
 
@@ -100,7 +110,7 @@ export const useUsers = () => {
         const response = await api.get(`/api/users/${userId}`);
         return response.data;
       },
-      enabled: !!userId,
+      enabled: !!userId && isClient && hasToken,
     });
   };
 
@@ -160,7 +170,7 @@ export const useUsers = () => {
     hasMore: usersData?.has_more || false,
     
     // Estados de carregamento
-    isLoading,
+    isLoading: isLoading || !isClient, // Loading até estar no cliente
     isError: !!error,
     error,
     
