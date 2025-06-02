@@ -57,6 +57,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://okr-flow.vercel.app",
+        "https://okr-flow-andrelaudares-projects.vercel.app",
         "https://okr-flow-*.vercel.app",  # Para preview deploys
         "http://localhost:3000",
         "http://localhost:5173",
