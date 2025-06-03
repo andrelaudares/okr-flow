@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi import HTTPException, status
 from contextlib import asynccontextmanager
 import uvicorn
 import asyncio
@@ -158,20 +159,94 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Endpoint adicional para verificação de saúde"""
-    from .utils.supabase import check_connection
+    """Endpoint adicional para verificação de saúde com informações detalhadas"""
+    from .utils.supabase import check_connection, get_connectivity_status
+    import os
     
     supabase_status = check_connection()
+    connectivity_info = get_connectivity_status()
     
-    return {
+    # Detectar ambiente
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+    is_local = environment in ["development", "dev", "local"]
+    
+    health_data = {
         "status": "healthy" if supabase_status else "degraded", 
         "timestamp": "2024",
+        "environment": environment,
         "supabase": "connected" if supabase_status else "disconnected",
+        "connectivity_details": connectivity_info,
         "config": {
             "workers": settings.WORKERS_COUNT,
             "timeout_keep_alive": settings.TIMEOUT_KEEP_ALIVE,
             "environment": "production" if settings.LOG_LEVEL == "WARNING" else "development"
         }
+    }
+    
+    # Em ambiente local, adicionar informações de diagnóstico
+    if is_local:
+        health_data["local_diagnostics"] = {
+            "supabase_url_configured": bool(os.getenv("SUPABASE_URL")),
+            "supabase_key_configured": bool(os.getenv("SUPABASE_KEY")),
+            "supabase_service_key_configured": bool(os.getenv("SUPABASE_SERVICE_KEY")),
+            "cors_origins": [
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:8080"
+            ],
+            "tips": [
+                "Verifique se o arquivo backend/.env existe",
+                "Confirme se as credenciais Supabase estão corretas",
+                "Teste a conectividade com internet"
+            ]
+        }
+    
+    return health_data
+
+@app.get("/debug/connectivity")
+async def debug_connectivity():
+    """Endpoint de debug para problemas de conectividade (apenas ambiente local)"""
+    import os
+    from .utils.supabase import get_connectivity_status, refresh_all_connections
+    
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+    if environment not in ["development", "dev", "local"]:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Endpoint não disponível em produção"
+        )
+    
+    # Obter status atual
+    connectivity_status = get_connectivity_status()
+    
+    # Tentar renovar conexões
+    try:
+        print("DEBUG: Renovando conexões para diagnóstico...")
+        refresh_all_connections()
+        renewed_status = get_connectivity_status()
+        renewal_success = True
+    except Exception as e:
+        renewed_status = str(e)
+        renewal_success = False
+    
+    return {
+        "message": "Diagnóstico de conectividade",
+        "current_status": connectivity_status,
+        "renewal_attempted": True,
+        "renewal_success": renewal_success,
+        "renewed_status": renewed_status,
+        "environment_variables": {
+            "SUPABASE_URL": "✓ Configurada" if os.getenv("SUPABASE_URL") else "✗ Não configurada",
+            "SUPABASE_KEY": "✓ Configurada" if os.getenv("SUPABASE_KEY") else "✗ Não configurada", 
+            "SUPABASE_SERVICE_KEY": "✓ Configurada" if os.getenv("SUPABASE_SERVICE_KEY") else "✗ Não configurada",
+            "ENVIRONMENT": os.getenv("ENVIRONMENT", "development")
+        },
+        "recommendations": [
+            "Execute: cp backend/env.example backend/.env",
+            "Configure suas credenciais Supabase no arquivo .env",
+            "Verifique sua conexão com internet",
+            "Reinicie o servidor backend após configurar"
+        ]
     }
 
 @app.post("/admin/refresh-connections")
