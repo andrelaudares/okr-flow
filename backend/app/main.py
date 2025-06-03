@@ -56,7 +56,7 @@ class JWTHealthMiddleware:
         try:
             await self.app(scope, receive, send_wrapper)
             
-            # Se houve erro 500 e suspeita de JWT expirado
+            # Se houve erro 500 e suspeita de JWT do servidor expirado
             if status_code == 500:
                 response_text = response_body.decode('utf-8', errors='ignore').lower()
                 jwt_expired = any(error in response_text for error in [
@@ -68,16 +68,22 @@ class JWTHealthMiddleware:
                     
                     # Evitar renovações muito frequentes (máximo 1 por minuto)
                     if current_time - self.last_jwt_error_time > 60:
-                        print("🔧 Middleware: JWT expirado detectado, renovando conexões...")
+                        print("🔧 Middleware: JWT de servidor expirado detectado, renovando conexões...")
                         
                         try:
                             from .utils.supabase import refresh_all_connections
                             refresh_all_connections()
                             self.last_jwt_error_time = current_time
                             self.jwt_error_count += 1
-                            print(f"✅ Middleware: Conexões renovadas (total: {self.jwt_error_count})")
+                            print(f"✅ Middleware: Conexões de servidor renovadas (total: {self.jwt_error_count})")
                         except Exception as e:
                             print(f"❌ Middleware: Erro ao renovar conexões: {e}")
+            
+            # 🆕 Log para tokens de usuário expirados (401)
+            elif status_code == 401:
+                response_text = response_body.decode('utf-8', errors='ignore').lower()
+                if any(expired_term in response_text for expired_term in ['expirou', 'expired', 'invalid jwt']):
+                    print("🔑 Middleware: Token de usuário expirado detectado")
                     
         except Exception as e:
             print(f"🚨 Middleware: Erro inesperado: {e}")
@@ -296,6 +302,85 @@ async def health_check():
         }
     
     return health_data
+
+@app.get("/auth/token-status")
+async def check_token_status(request: Request):
+    """Endpoint para verificar status do token do usuário"""
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return {
+                "valid": False,
+                "expired": True,
+                "message": "Token não fornecido"
+            }
+        
+        token = auth_header.replace("Bearer ", "")
+        
+        from .utils.supabase import get_client
+        import jwt
+        import time
+        
+        try:
+            # Verificar com Supabase
+            supabase_client = get_client()
+            user_response = supabase_client.auth.get_user(jwt=token)
+            
+            if not user_response.user:
+                return {
+                    "valid": False,
+                    "expired": True,
+                    "message": "Token inválido"
+                }
+            
+            # Decodificar JWT para verificar expiração
+            try:
+                # Decodificar sem verificar assinatura (só queremos o payload)
+                decoded = jwt.decode(token, options={"verify_signature": False})
+                exp = decoded.get('exp', 0)
+                current_time = int(time.time())
+                
+                # Verificar se token expira em menos de 10 minutos
+                expires_in_seconds = exp - current_time
+                expires_soon = expires_in_seconds < 600  # 10 minutos
+                
+                return {
+                    "valid": True,
+                    "expired": False,
+                    "expires_soon": expires_soon,
+                    "expires_in_minutes": round(expires_in_seconds / 60, 1),
+                    "message": "Token válido" if not expires_soon else "Token expira em breve"
+                }
+                
+            except Exception as jwt_error:
+                return {
+                    "valid": True,
+                    "expired": False,
+                    "expires_soon": False,
+                    "message": "Token válido (não foi possível verificar expiração)"
+                }
+        
+        except Exception as supabase_error:
+            error_str = str(supabase_error).lower()
+            if any(exp_term in error_str for exp_term in ['expired', 'invalid jwt']):
+                return {
+                    "valid": False,
+                    "expired": True,
+                    "message": "Token expirado"
+                }
+            else:
+                return {
+                    "valid": False,
+                    "expired": False,
+                    "message": "Erro ao verificar token"
+                }
+        
+    except Exception as e:
+        return {
+            "valid": False,
+            "expired": False,
+            "message": f"Erro interno: {str(e)}"
+        }
 
 @app.get("/monitor/jwt-status")
 async def monitor_jwt_status():

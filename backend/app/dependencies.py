@@ -104,7 +104,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Sua sessão expirou. Faça login novamente para continuar.",
-                    headers={"WWW-Authenticate": "Bearer"},
+                    headers={
+                        "WWW-Authenticate": "Bearer",
+                        "X-Token-Expired": "true",
+                        "X-Refresh-Required": "true",
+                        "X-Message": "Sua sessão expirou. Faça login novamente para continuar."
+                    },
                 )
             elif any(phrase in error_str for phrase in ['invalid signature', 'malformed', 'invalid token']):
                 # Token inválido/malformado 
