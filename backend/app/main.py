@@ -540,6 +540,15 @@ async def check_jwt_health():
             "message": "Erro ao verificar saúde dos JWTs"
         }
 
+@app.get("/test")
+async def test_endpoint():
+    """Endpoint de teste simples"""
+    return {
+        "status": "OK",
+        "message": "Backend funcionando normalmente",
+        "timestamp": time.time()
+    }
+
 # Configuração para execução direta (opcional)
 if __name__ == "__main__":
     uvicorn.run(
