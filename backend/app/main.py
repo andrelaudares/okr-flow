@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request, Response
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import uvicorn
 import asyncio
@@ -13,14 +14,83 @@ from .core.settings import settings
 # Task para renovação automática de conexões
 _refresh_task = None
 
+# 🔧 Middleware personalizado para detectar e resolver problemas de JWT automaticamente
+class JWTHealthMiddleware:
+    """Middleware que detecta problemas de JWT e renova conexões automaticamente"""
+    
+    def __init__(self, app):
+        self.app = app
+        self.last_jwt_error_time = 0
+        self.jwt_error_count = 0
+        
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+            
+        request = Request(scope, receive)
+        
+        # Detectar se é uma rota que usa Supabase
+        path = request.url.path
+        uses_supabase = any(route in path for route in [
+            "/api/auth", "/api/users", "/api/companies", "/api/cycles", 
+            "/api/objectives", "/api/dashboard", "/api/reports"
+        ])
+        
+        if not uses_supabase:
+            await self.app(scope, receive, send)
+            return
+        
+        # Função para capturar respostas
+        response_body = b""
+        status_code = 200
+        
+        async def send_wrapper(message):
+            nonlocal response_body, status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+            elif message["type"] == "http.response.body":
+                response_body += message.get("body", b"")
+            await send(message)
+        
+        try:
+            await self.app(scope, receive, send_wrapper)
+            
+            # Se houve erro 500 e suspeita de JWT expirado
+            if status_code == 500:
+                response_text = response_body.decode('utf-8', errors='ignore').lower()
+                jwt_expired = any(error in response_text for error in [
+                    'jwt expired', 'pgrst301', 'expired', 'invalid jwt', 'token has expired'
+                ])
+                
+                if jwt_expired:
+                    current_time = time.time()
+                    
+                    # Evitar renovações muito frequentes (máximo 1 por minuto)
+                    if current_time - self.last_jwt_error_time > 60:
+                        print("🔧 Middleware: JWT expirado detectado, renovando conexões...")
+                        
+                        try:
+                            from .utils.supabase import refresh_all_connections
+                            refresh_all_connections()
+                            self.last_jwt_error_time = current_time
+                            self.jwt_error_count += 1
+                            print(f"✅ Middleware: Conexões renovadas (total: {self.jwt_error_count})")
+                        except Exception as e:
+                            print(f"❌ Middleware: Erro ao renovar conexões: {e}")
+                    
+        except Exception as e:
+            print(f"🚨 Middleware: Erro inesperado: {e}")
+            await self.app(scope, receive, send)
+
 async def refresh_connections_periodically():
     """Task que roda em background para renovar conexões do Supabase periodicamente"""
     from .utils.supabase import refresh_all_connections, check_connection
     
     while True:
         try:
-            # Aguardar 1 hora (3600 segundos)
-            await asyncio.sleep(3600)
+            # Aguardar 30 minutos em vez de 1 hora para evitar JWT expirado
+            await asyncio.sleep(1800)  # 30 minutos
             
             print("🔄 Verificando conexões Supabase...")
             
@@ -28,15 +98,31 @@ async def refresh_connections_periodically():
             if not check_connection():
                 print("⚠️  Conexão Supabase com problemas, renovando...")
                 refresh_all_connections()
+                
+                # Verificar novamente após renovação
+                if check_connection():
+                    print("✅ Conexões renovadas com sucesso")
+                else:
+                    print("❌ Falha na renovação - problemas persistem")
             else:
                 print("✅ Conexões Supabase funcionando normalmente")
+                # Renovar proativamente mesmo quando funcionando (evitar JWT expirar)
+                refresh_all_connections()
+                print("🔄 Renovação proativa concluída")
                 
         except asyncio.CancelledError:
             print("🛑 Task de renovação de conexões cancelada")
             break
         except Exception as e:
             print(f"❌ Erro na task de renovação: {e}")
-            # Continuar mesmo com erro
+            # Tentar renovar mesmo com erro
+            try:
+                refresh_all_connections()
+                print("🔧 Renovação de emergência executada")
+            except Exception as e_emergency:
+                print(f"❌ Falha na renovação de emergência: {e_emergency}")
+            
+            # Aguardar menos tempo antes de tentar novamente
             await asyncio.sleep(300)  # Aguardar 5 minutos antes de tentar novamente
 
 # Lifecycle manager otimizado para startup/shutdown
@@ -93,6 +179,9 @@ app = FastAPI(
 # Middleware de compressão GZip para melhorar performance
 if settings.ENABLE_GZIP:
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# 🔧 Middleware personalizado para detectar problemas de JWT (DEVE ser adicionado ANTES dos outros)
+app.add_middleware(JWTHealthMiddleware)
 
 # Middleware de hosts confiáveis (segurança) - ATUALIZADO
 app.add_middleware(
@@ -172,10 +261,15 @@ async def health_check():
     
     health_data = {
         "status": "healthy" if supabase_status else "degraded", 
-        "timestamp": "2024",
+        "timestamp": time.time(),
         "environment": environment,
         "supabase": "connected" if supabase_status else "disconnected",
         "connectivity_details": connectivity_info,
+        "jwt_health": {
+            "needs_refresh": not supabase_status,
+            "last_refresh": connectivity_info.get("last_success", 0),
+            "error_count": connectivity_info.get("error_count", 0)
+        },
         "config": {
             "workers": settings.WORKERS_COUNT,
             "timeout_keep_alive": settings.TIMEOUT_KEEP_ALIVE,
@@ -202,6 +296,49 @@ async def health_check():
         }
     
     return health_data
+
+@app.get("/monitor/jwt-status")
+async def monitor_jwt_status():
+    """Endpoint de monitoramento específico para status dos JWTs (pode ser chamado pelo frontend)"""
+    try:
+        from .utils.supabase import get_admin_client, _test_client_health, get_connectivity_status
+        
+        # Testar cliente admin
+        admin_client = get_admin_client()
+        admin_healthy = _test_client_health(admin_client) if admin_client else False
+        
+        connectivity = get_connectivity_status()
+        
+        current_time = time.time()
+        last_success = connectivity.get("last_success", 0)
+        time_since_success = current_time - last_success
+        
+        # Determinar se precisa de renovação
+        needs_refresh = (
+            not admin_healthy or 
+            time_since_success > 1800 or  # Mais de 30 minutos sem sucesso
+            connectivity.get("consecutive_failures", 0) > 2
+        )
+        
+        return {
+            "jwt_healthy": admin_healthy,
+            "needs_refresh": needs_refresh,
+            "time_since_last_success_minutes": round(time_since_success / 60, 1),
+            "consecutive_failures": connectivity.get("consecutive_failures", 0),
+            "error_count": connectivity.get("error_count", 0),
+            "last_error": connectivity.get("last_error"),
+            "timestamp": current_time,
+            "recommended_action": "refresh_tokens" if needs_refresh else "none"
+        }
+        
+    except Exception as e:
+        return {
+            "jwt_healthy": False,
+            "needs_refresh": True,
+            "error": str(e),
+            "timestamp": time.time(),
+            "recommended_action": "refresh_tokens"
+        }
 
 @app.get("/debug/connectivity")
 async def debug_connectivity():
@@ -272,6 +409,50 @@ async def force_refresh_connections():
             "message": "Erro ao renovar conexões",
             "error": str(e),
             "timestamp": time.time()
+        }
+
+@app.post("/admin/check-jwt-health")
+async def check_jwt_health():
+    """Endpoint para verificar saúde dos JWTs e renovar se necessário"""
+    try:
+        from .utils.supabase import get_admin_client, _test_client_health, refresh_all_connections
+        
+        print("🔍 Verificando saúde dos tokens JWT...")
+        
+        # Testar cliente admin
+        admin_client = get_admin_client()
+        admin_healthy = _test_client_health(admin_client)
+        
+        result = {
+            "admin_jwt_healthy": admin_healthy,
+            "timestamp": time.time(),
+            "action_taken": None
+        }
+        
+        if not admin_healthy:
+            print("🔧 JWT admin com problemas, renovando...")
+            refresh_all_connections()
+            
+            # Testar novamente
+            admin_client_new = get_admin_client()
+            admin_healthy_new = _test_client_health(admin_client_new)
+            
+            result.update({
+                "admin_jwt_healthy_after_refresh": admin_healthy_new,
+                "action_taken": "refresh_connections",
+                "message": "Conexões renovadas devido a JWT expirado"
+            })
+        else:
+            result["message"] = "Todos os JWTs estão funcionando normalmente"
+        
+        return result
+        
+    except Exception as e:
+        print(f"❌ Erro na verificação de JWT: {e}")
+        return {
+            "error": str(e),
+            "timestamp": time.time(),
+            "message": "Erro ao verificar saúde dos JWTs"
         }
 
 # Configuração para execução direta (opcional)

@@ -14,14 +14,20 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # service_role key
 _client_cache = {}
 _admin_cache = {}
 _last_refresh_time = 0
-REFRESH_INTERVAL = 3600  # Renovar conexões a cada 1 hora
+_last_connectivity_check = 0
 
-# Status de conectividade
+# Configurações ajustadas para melhor performance
+REFRESH_INTERVAL = 1800  # Renovar conexões a cada 30 minutos em vez de 1 hora
+CONNECTIVITY_CHECK_INTERVAL = 60  # Verificar conectividade a cada 1 minuto
+
+# Status de conectividade melhorado
 _connectivity_status = {
     "last_check": 0,
     "is_connected": True,
     "error_count": 0,
-    "last_error": None
+    "last_error": None,
+    "consecutive_failures": 0,
+    "last_success": time.time()
 }
 
 def _is_local_environment() -> bool:
@@ -30,12 +36,12 @@ def _is_local_environment() -> bool:
     return environment in ["development", "dev", "local"]
 
 def _should_refresh_connection() -> bool:
-    """Verifica se deve renovar as conexões"""
+    """Verifica se deve renovar as conexões com intervalo menor"""
     global _last_refresh_time
     current_time = time.time()
     
-    # Em ambiente local, verificar a cada 30 minutos em vez de 1 hora
-    interval = 1800 if _is_local_environment() else REFRESH_INTERVAL
+    # Usar intervalo menor para evitar JWT expirado
+    interval = 900 if _is_local_environment() else REFRESH_INTERVAL  # 15 min local, 30 min produção
     
     if current_time - _last_refresh_time > interval:
         _last_refresh_time = current_time
@@ -43,13 +49,13 @@ def _should_refresh_connection() -> bool:
     return False
 
 def _check_connectivity() -> bool:
-    """Verifica conectividade básica com mais tolerância para ambiente local"""
+    """Verifica conectividade com sistema mais inteligente de detecção de problemas"""
     global _connectivity_status
     
     current_time = time.time()
     
-    # Verificar apenas a cada 30 segundos para evitar spam
-    if current_time - _connectivity_status["last_check"] < 30:
+    # Verificar apenas a cada minuto para reduzir spam mas manter responsividade
+    if current_time - _connectivity_status["last_check"] < CONNECTIVITY_CHECK_INTERVAL:
         return _connectivity_status["is_connected"]
     
     _connectivity_status["last_check"] = current_time
@@ -58,36 +64,57 @@ def _check_connectivity() -> bool:
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
             _connectivity_status["is_connected"] = False
             _connectivity_status["last_error"] = "Credenciais não configuradas"
+            _connectivity_status["consecutive_failures"] += 1
             return False
         
-        # Teste rápido de conectividade
+        # Criar um novo cliente para teste (não usar cache)
         test_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
         
-        # Timeout mais baixo para teste local
+        # Teste mais simples e rápido
         response = test_client.from_('users').select('id').limit(1).execute()
         
+        # Reset em caso de sucesso
         _connectivity_status["is_connected"] = True
         _connectivity_status["error_count"] = 0
+        _connectivity_status["consecutive_failures"] = 0
         _connectivity_status["last_error"] = None
+        _connectivity_status["last_success"] = current_time
         return True
         
     except Exception as e:
         _connectivity_status["error_count"] += 1
+        _connectivity_status["consecutive_failures"] += 1
         _connectivity_status["last_error"] = str(e)
         
-        # Em ambiente local, ser mais tolerante a erros de conectividade
-        if _is_local_environment():
-            # Permitir até 3 erros consecutivos antes de marcar como desconectado
-            _connectivity_status["is_connected"] = _connectivity_status["error_count"] < 3
-        else:
-            # Em produção, marcar como desconectado imediatamente
+        # Sistema de tolerância melhorado
+        max_failures = 5 if _is_local_environment() else 3
+        
+        if _connectivity_status["consecutive_failures"] >= max_failures:
             _connectivity_status["is_connected"] = False
+            print(f"DEBUG: Conectividade perdida após {_connectivity_status['consecutive_failures']} falhas consecutivas")
         
         print(f"DEBUG: Erro de conectividade Supabase (tentativa {_connectivity_status['error_count']}): {e}")
         return _connectivity_status["is_connected"]
 
+def _test_client_health(client: Optional[Client]) -> bool:
+    """Testa se um cliente específico está funcionando"""
+    if not client:
+        return False
+    
+    try:
+        # Teste rápido para verificar se o cliente está funcionando
+        response = client.from_('users').select('id').limit(1).execute()
+        return True
+    except Exception as e:
+        error_str = str(e).lower()
+        # Detectar especificamente erro de JWT expirado
+        if any(jwt_error in error_str for jwt_error in ['jwt expired', 'pgrst301', 'expired', 'invalid jwt']):
+            print(f"DEBUG: Cliente com JWT expirado detectado: {e}")
+            return False
+        return False
+
 def get_supabase_client(force_refresh: bool = False) -> Optional[Client]:
-    """Cliente Supabase para operações normais (anon key) com renovação automática"""
+    """Cliente Supabase para operações normais (anon key) com renovação automática melhorada"""
     global _client_cache
     
     if not SUPABASE_URL or not SUPABASE_KEY:
@@ -96,7 +123,15 @@ def get_supabase_client(force_refresh: bool = False) -> Optional[Client]:
     
     cache_key = f"{SUPABASE_URL}_{SUPABASE_KEY}"
     
-    if force_refresh or _should_refresh_connection() or cache_key not in _client_cache:
+    # Verificar se precisa renovar ou se o cliente existente está com problema
+    should_refresh = (
+        force_refresh or 
+        _should_refresh_connection() or 
+        cache_key not in _client_cache or
+        not _test_client_health(_client_cache.get(cache_key))
+    )
+    
+    if should_refresh:
         try:
             print("DEBUG: Criando novo cliente Supabase (anon)")
             client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -109,7 +144,7 @@ def get_supabase_client(force_refresh: bool = False) -> Optional[Client]:
     return _client_cache.get(cache_key)
 
 def get_supabase_admin(force_refresh: bool = False) -> Optional[Client]:
-    """Cliente Supabase para operações administrativas (service_role key) com renovação automática"""
+    """Cliente Supabase para operações administrativas (service_role key) com renovação automática melhorada"""
     global _admin_cache
     
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
@@ -118,7 +153,15 @@ def get_supabase_admin(force_refresh: bool = False) -> Optional[Client]:
     
     cache_key = f"{SUPABASE_URL}_{SUPABASE_SERVICE_KEY}"
     
-    if force_refresh or _should_refresh_connection() or cache_key not in _admin_cache:
+    # Verificar se precisa renovar ou se o cliente existente está com problema
+    should_refresh = (
+        force_refresh or 
+        _should_refresh_connection() or 
+        cache_key not in _admin_cache or
+        not _test_client_health(_admin_cache.get(cache_key))
+    )
+    
+    if should_refresh:
         try:
             print("DEBUG: Criando novo cliente Supabase Admin (service_role)")
             admin_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -171,27 +214,29 @@ def supabase_super_admin():
     return _supabase_super_admin
 
 def check_connection() -> bool:
-    """Verifica se a conexão está funcionando com sistema de tolerância para ambiente local"""
+    """Verifica se a conexão está funcionando com sistema de tolerância melhorado"""
     try:
         if not _check_connectivity():
-            print("DEBUG: Conectividade Supabase com problemas")
+            print("DEBUG: Conectividade Supabase com problemas - tentando renovar...")
             
-            # Em ambiente local, tentar renovar automaticamente
-            if _is_local_environment():
-                print("DEBUG: Ambiente local detectado - tentando renovar conexão...")
-                admin = get_supabase_admin(force_refresh=True)
-                if admin:
-                    test = admin.from_('users').select('id').limit(1).execute()
-                    print("DEBUG: Renovação bem-sucedida")
-                    return True
+            # Tentar renovar automaticamente em qualquer ambiente
+            admin = get_supabase_admin(force_refresh=True)
+            if admin and _test_client_health(admin):
+                print("DEBUG: Renovação bem-sucedida")
+                return True
             
+            print("DEBUG: Renovação falhou")
             return False
         
         # Se a conectividade está OK, fazer teste final
         admin = get_supabase_admin()
-        if admin:
-            test = admin.from_('users').select('id').limit(1).execute()
+        if admin and _test_client_health(admin):
             return True
+        else:
+            # Se o teste falhou, forçar renovação
+            print("DEBUG: Teste de saúde do cliente falhou, renovando...")
+            admin = get_supabase_admin(force_refresh=True)
+            return admin and _test_client_health(admin)
             
     except Exception as e:
         print(f"DEBUG: Erro final na verificação de conexão: {e}")
@@ -199,10 +244,16 @@ def check_connection() -> bool:
     
     return False
 
-# Funções de acesso otimizadas com fallback de renovação
+# Funções de acesso otimizadas com fallback de renovação melhorado
 def get_client() -> Client:
     """Retorna o cliente Supabase, inicializando se necessário com melhor tratamento de erro"""
     client = get_supabase_client()
+    
+    # Se o cliente não existe ou não está funcionando, tentar renovar
+    if not client or not _test_client_health(client):
+        print("DEBUG: Cliente principal com problemas, renovando...")
+        client = get_supabase_client(force_refresh=True)
+    
     if not client:
         if _is_local_environment():
             raise ValueError("Cliente Supabase não configurado. Verifique as variáveis SUPABASE_URL e SUPABASE_KEY no arquivo .env")
@@ -213,6 +264,12 @@ def get_client() -> Client:
 def get_admin_client() -> Client:
     """Retorna o cliente Supabase admin, inicializando se necessário com melhor tratamento de erro"""
     admin = get_supabase_admin()
+    
+    # Se o cliente não existe ou não está funcionando, tentar renovar
+    if not admin or not _test_client_health(admin):
+        print("DEBUG: Cliente admin com problemas, renovando...")
+        admin = get_supabase_admin(force_refresh=True)
+    
     if not admin:
         if _is_local_environment():
             raise ValueError("Cliente Supabase admin não configurado. Verifique as variáveis SUPABASE_URL e SUPABASE_SERVICE_KEY no arquivo .env")
@@ -231,7 +288,7 @@ def get_super_admin_client() -> Client:
     return super_admin
 
 def refresh_all_connections():
-    """Força a renovação de todas as conexões - chamada periodicamente"""
+    """Força a renovação de todas as conexões - chamada periodicamente com melhorias"""
     global _client_cache, _admin_cache, _last_refresh_time, _connectivity_status
     
     print("DEBUG: Renovando todas as conexões Supabase...")
@@ -241,19 +298,28 @@ def refresh_all_connections():
     
     # Resetar status de conectividade
     _connectivity_status["error_count"] = 0
+    _connectivity_status["consecutive_failures"] = 0
     _connectivity_status["last_error"] = None
     _connectivity_status["last_check"] = 0
+    
+    # Limpar cache do super admin também
+    get_supabase_super_admin.cache_clear()
     
     # Recriar conexões
     get_supabase_client(force_refresh=True)
     get_supabase_admin(force_refresh=True)
+    
+    print("DEBUG: Renovação de conexões concluída")
 
 def get_connectivity_status():
     """Retorna informações detalhadas sobre o status de conectividade"""
     return {
         "is_connected": _connectivity_status["is_connected"],
         "error_count": _connectivity_status["error_count"],
+        "consecutive_failures": _connectivity_status["consecutive_failures"],
         "last_error": _connectivity_status["last_error"],
+        "last_success": _connectivity_status["last_success"],
         "environment": "local" if _is_local_environment() else "production",
-        "credentials_configured": bool(SUPABASE_URL and SUPABASE_KEY and SUPABASE_SERVICE_KEY)
+        "credentials_configured": bool(SUPABASE_URL and SUPABASE_KEY and SUPABASE_SERVICE_KEY),
+        "refresh_interval": 900 if _is_local_environment() else REFRESH_INTERVAL
     } 

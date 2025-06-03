@@ -258,13 +258,22 @@ async def login_user(user_data: UserLogin, request: Request):
                 user_check = supabase_admin().from_('users').select("*").eq('email', user_data.email).execute()
             except Exception as e_first:
                 error_msg = str(e_first)
-                if 'JWT expired' in error_msg or 'PGRST301' in error_msg:
+                if any(jwt_error in error_msg.lower() for jwt_error in ['jwt expired', 'pgrst301', 'expired', 'invalid jwt']):
                     print("DEBUG: Token JWT do admin expirado, renovando conexão...")
-                    # Renovar conexão admin e tentar novamente
+                    # Usar o novo sistema de renovação automática
                     from ..utils.supabase import refresh_all_connections, get_admin_client
                     refresh_all_connections()
-                    supabase_admin_new = get_admin_client()
-                    user_check = supabase_admin_new.from_('users').select("*").eq('email', user_data.email).execute()
+                    
+                    # Tentar novamente com cliente renovado
+                    try:
+                        supabase_admin_new = get_admin_client()
+                        user_check = supabase_admin_new.from_('users').select("*").eq('email', user_data.email).execute()
+                        print("DEBUG: Sucesso após renovação de conexão")
+                    except Exception as e_retry:
+                        print(f"DEBUG: Erro mesmo após renovação: {e_retry}")
+                        # Se ainda falhou, tentar uma terceira vez forçando nova instância
+                        supabase_admin_final = get_admin_client()
+                        user_check = supabase_admin_final.from_('users').select("*").eq('email', user_data.email).execute()
                 else:
                     raise e_first
             

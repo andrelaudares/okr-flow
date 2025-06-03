@@ -6,7 +6,7 @@ import time
 from functools import lru_cache
 import os
 
-from .utils.supabase import get_client, get_admin_client, get_connectivity_status
+from .utils.supabase import get_client, get_admin_client, get_connectivity_status, refresh_all_connections
 from .models.user import UserProfile
 
 # Define o esquema OAuth2 para obter o token
@@ -135,8 +135,29 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         
         # Buscar dados completos do usuário na tabela users
         try:
-            # Buscar dados do usuário usando o cliente admin
-            user_response = supabase_admin.from_('users').select("*").eq('id', str(user_id)).single().execute()
+            # Tentar buscar dados do usuário usando o cliente admin
+            try:
+                user_response = supabase_admin.from_('users').select("*").eq('id', str(user_id)).single().execute()
+            except Exception as e_admin:
+                error_str = str(e_admin).lower()
+                # Detectar JWT expirado no cliente admin e renovar automaticamente
+                if any(jwt_error in error_str for jwt_error in ['jwt expired', 'pgrst301', 'expired', 'invalid jwt']):
+                    print("DEBUG: JWT do cliente admin expirado, renovando automaticamente...")
+                    refresh_all_connections()
+                    
+                    # Tentar novamente com cliente renovado
+                    try:
+                        supabase_admin_renewed = get_admin_client()
+                        user_response = supabase_admin_renewed.from_('users').select("*").eq('id', str(user_id)).single().execute()
+                        print("DEBUG: Sucesso após renovação automática do cliente admin")
+                    except Exception as e_retry:
+                        print(f"DEBUG: Erro persistente após renovação: {e_retry}")
+                        raise HTTPException(
+                            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Problema temporário no sistema de autenticação. Tente fazer login novamente."
+                        )
+                else:
+                    raise e_admin
             
             if not user_response.data:
                 print(f"DEBUG: Usuário {user_id} não encontrado na tabela users")
@@ -202,10 +223,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
             detail=detail
         )
 
-
 def get_supabase_admin() -> Client:
     """
-    Dependency otimizada para obter o cliente Supabase admin com tratamento melhorado de erro.
+    Dependency para obter o cliente Supabase admin.
     """
     try:
         return get_admin_client()
