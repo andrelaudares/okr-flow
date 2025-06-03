@@ -7,9 +7,9 @@ interface ApiErrorResponse {
   message?: string;
 }
 
-// Configuração base da API
+// Configuração base da API - CORRIGIDO nome da variável
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -42,7 +42,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor para tratar respostas e erros - SIMPLIFICADO
+// Interceptor para tratar respostas e erros - MELHORADO com mensagens mais didáticas
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
@@ -61,19 +61,26 @@ api.interceptors.response.use(
       if (isTokenExpired) {
         console.log('🔑 Token expirado detectado');
         
-        // Mostrar toast apenas uma vez
+        // Mostrar toast mais didático apenas uma vez
         if (!isTokenExpiredToastShown) {
           isTokenExpiredToastShown = true;
           
-          toast.error('Sessão Expirada', {
-            description: 'Sua sessão expirou. Você será redirecionado para fazer login novamente.',
-            duration: 5000,
+          toast.error('🔒 Sua Sessão Expirou', {
+            description: 'Por questões de segurança, você foi desconectado automaticamente. Clique abaixo para fazer login novamente e continuar usando o sistema.',
+            duration: 12000, // 12 segundos para dar tempo de ler
+            position: 'top-center',
+            action: {
+              label: '👆 Fazer Login Agora',
+              onClick: () => {
+                window.location.href = '/login';
+              }
+            }
           });
           
-          // Reset da flag após 10 segundos
+          // Reset da flag após 15 segundos
           setTimeout(() => {
             isTokenExpiredToastShown = false;
-          }, 10000);
+          }, 15000);
         }
         
         // Tentar refresh primeiro
@@ -96,6 +103,13 @@ api.interceptors.response.use(
             }
 
             console.log('✅ Token renovado com sucesso');
+            
+            // Toast de sucesso na renovação
+            toast.success('🔄 Sessão Renovada!', {
+              description: 'Sua sessão foi renovada automaticamente. Você pode continuar usando o sistema normalmente.',
+              duration: 8000
+            });
+            
             return api(originalRequest);
             
           } catch (refreshError) {
@@ -105,33 +119,45 @@ api.interceptors.response.use(
             
             setTimeout(() => {
               window.location.href = '/login';
-            }, 2000);
+            }, 3000);
           }
         } else {
           // Sem refresh token, ir direto para login
           setTimeout(() => {
             clearTokens();
             window.location.href = '/login';
-          }, 3000);
+          }, 4000);
         }
       }
     }
 
-    // Tratamento básico de outros erros
+    // Tratamento básico de outros erros com mensagens mais didáticas
     if (error.response?.status !== 401) {
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message || 
                           error.message || 
                           'Erro inesperado';
       
-      // Mostrar toast apenas para erros relevantes
+      // Mostrar toasts mais didáticos para erros relevantes
       if (error.response?.status && error.response.status >= 500) {
-        toast.error('Erro do Servidor', {
-          description: 'Tente novamente em alguns instantes.',
+        toast.error('⚠️ Problema no Servidor', {
+          description: 'Nosso servidor está com dificuldades técnicas. Por favor, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato conosco.',
+          duration: 10000
         });
       } else if (error.response?.status === 403) {
-        toast.error('Acesso Negado', {
-          description: 'Você não tem permissão para esta ação.',
+        toast.error('🚫 Acesso Não Permitido', {
+          description: 'Você não tem permissão para realizar esta ação. Verifique com seu administrador se você deveria ter acesso a esta funcionalidade.',
+          duration: 8000
+        });
+      } else if (error.response?.status === 400) {
+        toast.error('📝 Dados Incorretos', {
+          description: `Verifique se todos os campos foram preenchidos corretamente: ${errorMessage}`,
+          duration: 8000
+        });
+      } else if (error.response?.status === 404) {
+        toast.error('🔍 Não Encontrado', {
+          description: 'A informação que você está procurando não foi encontrada. Ela pode ter sido removida ou nunca ter existido.',
+          duration: 8000
         });
       }
     }
