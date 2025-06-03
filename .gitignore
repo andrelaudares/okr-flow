@@ -1,5 +1,10 @@
+# Arquivos de ambiente
 env 
 .env
+.env.*
+!.env.example
+
+# Cache Python
 __pycache__
 
 # Logs
@@ -11,15 +16,34 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
 dist
 dist-ssr
 *.local
 
+# Arquivos de desenvolvimento local - NÃO FAZER COMMIT
+diagnose_local.py
+test_server_local.py
+setup_local.sh
+SETUP_LOCAL.md
+*_local.*
+*_LOCAL.*
+
+# Arquivos de ambiente específicos
+.env.development
+.env.production
+env.example
+
+# Context/test files
 contexto
 test_
 
-# Editor directories and files
+# Build outputs
+build/
+dist/
+
+# IDE files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -29,3 +53,21 @@ test_
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Coverage reports
+coverage/
+*.lcov

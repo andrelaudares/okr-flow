@@ -18,6 +18,7 @@ import CompanySettingsPage from "./pages/company/CompanySettings";
 import TestSimple from "./pages/TestSimple";
 import Navbar from "./components/layout/navbar";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { useTokenChecker } from "./hooks/use-token-checker";
 import SessionExpiredModal from "./components/auth/SessionExpiredModal";
 import Index from './pages/Index';
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -35,6 +36,9 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+
+  // 🔒 Ativar verificação automática de token para usuários logados
+  useTokenChecker();
 
   if (isLoading) {
     return (

@@ -16,8 +16,9 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-// Variável para evitar múltiplos toasts de token expirado
+// Variáveis para controle de tokens expirados
 let isTokenExpiredToastShown = false;
+let isHandlingTokenExpiration = false;
 
 // Helper functions para gerenciar tokens
 export const setTokens = (accessToken: string, refreshToken?: string) => {
@@ -33,6 +34,40 @@ export const clearTokens = () => {
   localStorage.removeItem('nobugOkrUser');
 };
 
+// Função para forçar logout quando token expira
+const forceLogoutDueToExpiredToken = () => {
+  if (isHandlingTokenExpiration) return; // Evitar múltiplas execuções
+  
+  isHandlingTokenExpiration = true;
+  
+  console.log('🔑 Forçando logout devido a token expirado');
+  
+  // Limpar todos os dados
+  clearTokens();
+  
+  // Mostrar toast explicativo se ainda não foi mostrado
+  if (!isTokenExpiredToastShown) {
+    isTokenExpiredToastShown = true;
+    
+    toast.error('🔒 Sessão Expirou - Login Necessário', {
+      description: 'Sua sessão de segurança expirou. Você será redirecionado para a página de login para continuar usando o sistema.',
+      duration: 8000, // 8 segundos
+      position: 'top-center',
+      action: {
+        label: '🔓 Ir para Login',
+        onClick: () => {
+          window.location.href = '/login';
+        }
+      }
+    });
+  }
+  
+  // Redirecionar após 3 segundos
+  setTimeout(() => {
+    window.location.href = '/login';
+  }, 3000);
+};
+
 // Interceptor para adicionar token de autenticação
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('nobugOkrToken');
@@ -42,52 +77,44 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor para tratar respostas e erros - MELHORADO com mensagens mais didáticas
+// Interceptor para tratar respostas e erros - MELHORADO com detecção mais robusta
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiErrorResponse>) => {
     const originalRequest = error.config;
 
-    // Tratamento de erro 401 (token expirado)
-    if (error.response?.status === 401 && originalRequest) {
+    // 🚨 DETECÇÃO ROBUSTA DE TOKEN EXPIRADO
+    if (error.response?.status === 401) {
       const errorDetail = error.response?.data?.detail || '';
+      const errorMessage = error.response?.data?.message || '';
       
-      // Verificar se é especificamente token expirado
-      const isTokenExpired = errorDetail.includes('expirado') || 
-                           errorDetail.includes('expired') || 
-                           errorDetail.includes('invalid JWT') ||
-                           errorDetail.includes('token has invalid claims');
+      // Verificar múltiplas formas de identificar token expirado
+      const tokenExpiredIndicators = [
+        'expirado', 'expired', 'invalid jwt', 'token has invalid claims',
+        'token is expired', 'unable to parse', 'verify signature',
+        'jwt expired', 'invalid token', 'authentication failed'
+      ];
+      
+      const isTokenExpired = tokenExpiredIndicators.some(indicator => 
+        errorDetail.toLowerCase().includes(indicator) || 
+        errorMessage.toLowerCase().includes(indicator)
+      );
+      
+      console.log('🔍 Análise de erro 401:', {
+        isTokenExpired,
+        errorDetail,
+        errorMessage,
+        url: originalRequest?.url
+      });
       
       if (isTokenExpired) {
-        console.log('🔑 Token expirado detectado');
+        console.log('🔑 Token expirado confirmado - iniciando processo de logout');
         
-        // Mostrar toast mais didático apenas uma vez
-        if (!isTokenExpiredToastShown) {
-          isTokenExpiredToastShown = true;
-          
-          toast.error('🔒 Sua Sessão Expirou', {
-            description: 'Por questões de segurança, você foi desconectado automaticamente. Clique abaixo para fazer login novamente e continuar usando o sistema.',
-            duration: 12000, // 12 segundos para dar tempo de ler
-            position: 'top-center',
-            action: {
-              label: '👆 Fazer Login Agora',
-              onClick: () => {
-                window.location.href = '/login';
-              }
-            }
-          });
-          
-          // Reset da flag após 15 segundos
-          setTimeout(() => {
-            isTokenExpiredToastShown = false;
-          }, 15000);
-        }
-        
-        // Tentar refresh primeiro
+        // Tentar refresh primeiro APENAS se não estivermos já lidando com expiração
         const refreshToken = localStorage.getItem('nobugOkrRefreshToken');
-        if (refreshToken && originalRequest.url !== '/api/auth/refresh') {
+        if (refreshToken && originalRequest && originalRequest.url !== '/api/auth/refresh' && !isHandlingTokenExpiration) {
           try {
-            console.log('🔄 Tentando renovar token...');
+            console.log('🔄 Tentativa única de renovar token...');
             const refreshResponse = await axios.post(`${api.defaults.baseURL}/api/auth/refresh`, {
               refresh_token: refreshToken
             });
@@ -102,36 +129,39 @@ api.interceptors.response.use(
               originalRequest.headers.Authorization = `Bearer ${access_token}`;
             }
 
-            console.log('✅ Token renovado com sucesso');
+            console.log('✅ Token renovado com sucesso na interceptação');
             
             // Toast de sucesso na renovação
-            toast.success('🔄 Sessão Renovada!', {
+            toast.success('🔄 Sessão Renovada Automaticamente!', {
               description: 'Sua sessão foi renovada automaticamente. Você pode continuar usando o sistema normalmente.',
-              duration: 8000
+              duration: 5000
             });
             
             return api(originalRequest);
             
           } catch (refreshError) {
-            console.log('❌ Falha ao renovar token:', refreshError);
-            // Se refresh falhou, redirecionar para login
-            clearTokens();
-            
-            setTimeout(() => {
-              window.location.href = '/login';
-            }, 3000);
+            console.log('❌ Falha ao renovar token na interceptação:', refreshError);
+            // Se refresh falhou, forçar logout
+            forceLogoutDueToExpiredToken();
+            return Promise.reject(error);
           }
         } else {
-          // Sem refresh token, ir direto para login
-          setTimeout(() => {
-            clearTokens();
-            window.location.href = '/login';
-          }, 4000);
+          // Sem refresh token ou já tentando refresh, forçar logout
+          console.log('🚪 Sem refresh token disponível ou já processando, forçando logout');
+          forceLogoutDueToExpiredToken();
+          return Promise.reject(error);
         }
+      } else {
+        // Erro 401 mas não relacionado a token expirado (ex: credenciais incorretas)
+        console.log('🔐 Erro 401 não relacionado a token expirado');
+        toast.error('🚫 Acesso Negado', {
+          description: 'Credenciais incorretas ou você não tem permissão para esta ação.',
+          duration: 6000
+        });
       }
     }
 
-    // Tratamento básico de outros erros com mensagens mais didáticas
+    // Tratamento de outros erros com mensagens mais didáticas
     if (error.response?.status !== 401) {
       const errorMessage = error.response?.data?.detail || 
                           error.response?.data?.message || 
