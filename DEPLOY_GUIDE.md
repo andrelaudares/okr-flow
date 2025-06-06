@@ -15,57 +15,6 @@
 
 ## 🔥 ARQUIVOS QUE VOCÊ DEVE ALTERAR
 
-### 📁 Backend - Arquivo `backend/app/main.py`
-
-**ENCONTRE esta linha (linha ~50):**
-```python
-allow_origins=["*"],  # Modificado para wildcard
-```
-
-**ALTERE PARA seus domínios:**
-```python
-allow_origins=["https://seudominio.com", "https://www.seudominio.com"],
-```
-
-**⚠️ Exemplo prático:**
-```python
-# ANTES (desenvolvimento)
-allow_origins=["*"],
-
-# DEPOIS (produção)
-allow_origins=["https://meuokr.com", "https://www.meuokr.com"],
-```
-
-### 📁 Frontend - Arquivo `frontend/.env`
-
-**CRIE o arquivo `.env` na pasta frontend:**
-```env
-# Sua URL do backend (Railway, Heroku, etc)
-VITE_API_URL=https://sua-api.railway.app
-VITE_ENVIRONMENT=production
-```
-
-**⚠️ Exemplo prático:**
-```env
-VITE_API_URL=https://okr-api-production.up.railway.app
-VITE_ENVIRONMENT=production
-```
-
-### 📁 Backend - Arquivo `backend/.env`
-
-**CRIE o arquivo `.env` na pasta backend:**
-```env
-SUPABASE_URL=https://tqdhcxzioahowqapftxb.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGhjeHppb2Fob3dxYXBmdHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4NjQ3OTMsImV4cCI6MjA2MzQ0MDc5M30.2gjDsqrT_Kx39-XmenGBgU4pvwpTPoKAYIedsh_H7XU
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGhjeHppb2Fob3dxYXBmdHhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzg2NDc5MywiZXhwIjoyMDYzNDQwNzkzfQ.elgZeOXS5LA6SK4ni1034VkUHP0VuAkJN_70n-efqJM
-ASAAS_API_KEY=$aact_hmlg_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjE5YzNhZmM0LTMwZGQtNDkzNy05YmNlLWZiNmRiYTkwM2EzYzo6JGFhY2hfMmEwOWIwNjEtMDU5Mi00MzRkLWE4YzYtOWQwNzBjYmU5ZGJm
-ENVIRONMENT=production
-WORKERS_COUNT=4
-TIMEOUT_KEEP_ALIVE=65
-ENABLE_GZIP=true
-LOG_LEVEL=WARNING
-```
-
 ---
 
 ### 2️⃣ Deploy do Backend (5 min)
