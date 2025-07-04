@@ -3,9 +3,18 @@ Configurações avançadas para otimização de performance
 """
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente
+load_dotenv()
 
 class Settings:
     """Configurações otimizadas para o sistema"""
+    
+    # 🔑 Configurações do Supabase - OBRIGATÓRIAS
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
     
     # Configurações de Cache
     CACHE_TTL: int = int(os.getenv("CACHE_TTL", "300"))  # 5 minutos
@@ -42,6 +51,13 @@ class Settings:
     # Configurações de sessão - para controle adicional
     SESSION_TIMEOUT: int = int(os.getenv("SESSION_TIMEOUT", str(24 * 3600)))  # 24 horas default
     EXTEND_SESSION_ON_ACTIVITY: bool = os.getenv("EXTEND_SESSION_ON_ACTIVITY", "true").lower() == "true"
+    
+    # 🌐 Configurações de URLs
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:8080")
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+    
+    # 💳 Configurações de pagamento
+    ASAAS_API_KEY: str = os.getenv("ASAAS_API_KEY", "")
 
 # Instância global das configurações
 settings = Settings() 
@@ -49,7 +65,7 @@ settings = Settings()
 # Configurações específicas para ambientes
 def get_environment_config():
     """Retorna configurações baseadas no ambiente"""
-    is_production = os.getenv("ENVIRONMENT") == "production"
+    is_production = settings.ENVIRONMENT == "production"
     
     if is_production:
         return {
@@ -57,7 +73,9 @@ def get_environment_config():
             "JWT_REFRESH_EXPIRATION_TIME": settings.JWT_REFRESH_EXPIRATION_TIME,
             "SESSION_TIMEOUT": settings.SESSION_TIMEOUT * 2,  # Dobrar em produção
             "LOG_LEVEL": "WARNING",
-            "ENABLE_DEBUG_LOGS": False
+            "ENABLE_DEBUG_LOGS": False,
+            "FRONTEND_URL": settings.FRONTEND_URL or "https://okr-flow.vercel.app",
+            "ENVIRONMENT": "production"
         }
     else:
         return {
@@ -65,5 +83,7 @@ def get_environment_config():
             "JWT_REFRESH_EXPIRATION_TIME": 30 * 24 * 3600,  # 30 dias em desenvolvimento  
             "SESSION_TIMEOUT": 8 * 3600,  # 8 horas em desenvolvimento
             "LOG_LEVEL": "INFO",
-            "ENABLE_DEBUG_LOGS": True
+            "ENABLE_DEBUG_LOGS": True,
+            "FRONTEND_URL": settings.FRONTEND_URL or "http://localhost:8080",
+            "ENVIRONMENT": "development"
         } 

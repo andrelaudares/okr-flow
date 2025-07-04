@@ -211,7 +211,7 @@ app.add_middleware(
         "https://okr-flow-andrelaudares-projects.vercel.app",
         "https://okr-flow-*.vercel.app",  # Para preview deploys
         "http://localhost:3000",
-        "http://localhost:5173",
+        "http://localhost:8080",
         "*"  # Fallback para desenvolvimento
     ],
     allow_credentials=True,

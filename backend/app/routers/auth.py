@@ -528,72 +528,48 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
             redirect_url = f"{env_config.get('FRONTEND_URL', 'https://okr-flow.vercel.app')}/reset-password"
         else:
             # URL de desenvolvimento
-            redirect_url = f"{env_config.get('FRONTEND_URL', 'http://localhost:5173')}/reset-password"
+            redirect_url = f"{env_config.get('FRONTEND_URL', 'http://localhost:8080')}/reset-password"
         
-        # Enviar email de reset usando a API direta do Supabase Auth
-        # Método funciona com todas as versões do SDK
+        print(f"DEBUG: Configurações do ambiente: {env_config}")
+        print(f"DEBUG: URL de redirecionamento configurada: {redirect_url}")
+        
+        # Enviar email de reset usando admin.generate_link (método mais confiável)
+        # Este método funciona mesmo com SMTP desabilitado
         try:
-            # Tentar o método nativo primeiro (pode existir em versões mais novas)
-            if hasattr(supabase_admin().auth, 'reset_password_for_email'):
-                reset_response = supabase_admin().auth.reset_password_for_email(
-                    reset_data.email,
-                    options={
-                        "redirect_to": redirect_url,
-                        "type": "recovery"  # Garantir que é recovery
-                    }
-                )
-            else:
-                # Fallback: usar requisição HTTP direta
-                import requests
-                import json
-                from ..core.settings import settings
-                
-                supabase_url = settings.SUPABASE_URL
-                supabase_key = settings.SUPABASE_KEY
-                
-                headers = {
-                    'apikey': supabase_key,
-                    'Authorization': f'Bearer {supabase_key}',
-                    'Content-Type': 'application/json'
-                }
-                
-                data = {
-                    'email': reset_data.email,
-                    'type': 'recovery',  # Especificar explicitamente como recovery
-                    'options': {
-                        'redirect_to': redirect_url
-                    }
-                }
-                
-                response = requests.post(
-                    f'{supabase_url}/auth/v1/recover',
-                    headers=headers,
-                    json=data
-                )
-                
-                if response.status_code not in [200, 201]:
-                    raise Exception(f'API Error: {response.status_code} - {response.text}')
-                
-                print(f"DEBUG: Reset enviado via API HTTP - Status: {response.status_code}")
-                
-        except Exception as api_error:
-            print(f"DEBUG: Erro na API de reset: {api_error}")
-            # Tentar método alternativo usando admin.generate_link
+            # MÉTODO PRINCIPAL: admin.generate_link
+            from ..core.settings import settings
+            
+            link_response = supabase_admin().auth.admin.generate_link({
+                'type': 'recovery',
+                'email': reset_data.email,
+                'options': {
+                    'redirect_to': "http://localhost:8080/reset-password"               }
+            })
+            print(f"DEBUG: Reset enviado via admin.generate_link - MÉTODO PRINCIPAL")
+            
+        except Exception as admin_error:
+            print(f"DEBUG: Erro no admin.generate_link: {admin_error}")
+            # Fallback 1: Tentar reset_password_for_email
             try:
-                # Usar admin.generate_link para reset de senha
-                link_response = supabase_admin().auth.admin.generate_link({
-                    'type': 'recovery',
-                    'email': reset_data.email,
-                    'options': {
-                        'redirect_to': redirect_url
-                    }
-                })
-                print(f"DEBUG: Reset enviado via admin.generate_link")
-            except Exception as link_error:
-                print(f"DEBUG: Erro no admin link: {link_error}")
-                # Último fallback: forçar o tipo de email correto
+                if hasattr(supabase_admin().auth, 'reset_password_for_email'):
+                    reset_response = supabase_admin().auth.reset_password_for_email(
+                        reset_data.email,
+                        options={
+                            "redirect_to": redirect_url,
+                            "type": "recovery"
+                        }
+                    )
+                    print(f"DEBUG: Reset enviado via reset_password_for_email - FALLBACK 1")
+                else:
+                    raise Exception("Método reset_password_for_email não disponível")
+                    
+            except Exception as fallback1_error:
+                print(f"DEBUG: Erro no fallback 1: {fallback1_error}")
+                # Fallback 2: Requisição HTTP direta
                 try:
-                    # Usar requisição HTTP com type específico
+                    import requests
+                    import json
+                    
                     headers = {
                         'apikey': settings.SUPABASE_SERVICE_KEY,
                         'Authorization': f'Bearer {settings.SUPABASE_SERVICE_KEY}',
@@ -602,7 +578,7 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
                     
                     data = {
                         'email': reset_data.email,
-                        'type': 'recovery',  # Especificar explicitamente o tipo
+                        'type': 'recovery',
                         'options': {
                             'redirect_to': redirect_url
                         }
@@ -615,13 +591,13 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
                     )
                     
                     if response.status_code not in [200, 201]:
-                        raise Exception(f'Fallback Error: {response.status_code} - {response.text}')
+                        raise Exception(f'HTTP Error: {response.status_code} - {response.text}')
                     
-                    print(f"DEBUG: Reset enviado via fallback com SERVICE_KEY")
+                    print(f"DEBUG: Reset enviado via HTTP direto - FALLBACK 2")
                     
                 except Exception as final_error:
                     print(f"DEBUG: Erro no fallback final: {final_error}")
-                    raise Exception(f"Erro ao enviar email de reset: {str(api_error)}")
+                    raise Exception(f"Erro ao enviar email de reset: {str(admin_error)}")
         
         print(f"DEBUG: Reset de senha solicitado para: {reset_data.email}")
         print(f"DEBUG: Redirect URL configurada: {redirect_url}")

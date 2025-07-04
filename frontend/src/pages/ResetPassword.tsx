@@ -17,8 +17,33 @@ const ResetPassword = () => {
   const { isLoading, message, error, requestReset, updatePassword } = useResetPassword();
   
   // Verificar se é um reset via token (usuário clicou no email)
-  const accessToken = searchParams.get('access_token');
-  const refreshToken = searchParams.get('refresh_token');
+  // Tokens podem vir via query params (?access_token=...) ou hash (#access_token=...)
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(null);
+  const [tokenType, setTokenType] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // Tentar capturar tokens dos query params primeiro
+    let token = searchParams.get('access_token');
+    let refresh = searchParams.get('refresh_token');
+    let type = searchParams.get('type');
+    
+    // Se não encontrou nos query params, tentar no hash
+    if (!token || !refresh) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      token = hashParams.get('access_token');
+      refresh = hashParams.get('refresh_token');
+      type = hashParams.get('type');
+    }
+    
+    if (token && refresh) {
+      setAccessToken(token);
+      setRefreshToken(refresh);
+      setTokenType(type);
+      console.log('Tokens capturados:', { type, hasToken: !!token, hasRefresh: !!refresh });
+    }
+  }, [searchParams]);
+  
   const isTokenReset = Boolean(accessToken && refreshToken);
   
   // Estados para o formulário
@@ -105,7 +130,7 @@ const ResetPassword = () => {
           </CardTitle>
           <CardDescription>
             {isTokenReset 
-              ? 'Digite sua nova senha abaixo'
+              ? `Digite sua nova senha abaixo ${tokenType ? `(Tipo: ${tokenType})` : ''}`
               : 'Digite seu email para receber instruções de recuperação'
             }
           </CardDescription>
