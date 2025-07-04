@@ -537,7 +537,10 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
             if hasattr(supabase_admin().auth, 'reset_password_for_email'):
                 reset_response = supabase_admin().auth.reset_password_for_email(
                     reset_data.email,
-                    options={"redirect_to": redirect_url}
+                    options={
+                        "redirect_to": redirect_url,
+                        "type": "recovery"  # Garantir que é recovery
+                    }
                 )
             else:
                 # Fallback: usar requisição HTTP direta
@@ -556,6 +559,7 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
                 
                 data = {
                     'email': reset_data.email,
+                    'type': 'recovery',  # Especificar explicitamente como recovery
                     'options': {
                         'redirect_to': redirect_url
                     }
@@ -574,19 +578,50 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
                 
         except Exception as api_error:
             print(f"DEBUG: Erro na API de reset: {api_error}")
-            # Tentar método alternativo usando sign_in_with_otp
+            # Tentar método alternativo usando admin.generate_link
             try:
-                # Usar OTP como alternativa
-                otp_response = supabase_admin().auth.sign_in_with_otp({
+                # Usar admin.generate_link para reset de senha
+                link_response = supabase_admin().auth.admin.generate_link({
+                    'type': 'recovery',
                     'email': reset_data.email,
                     'options': {
-                        'email_redirect_to': redirect_url
+                        'redirect_to': redirect_url
                     }
                 })
-                print(f"DEBUG: Reset enviado via OTP como fallback")
-            except Exception as otp_error:
-                print(f"DEBUG: Erro no OTP fallback: {otp_error}")
-                raise Exception(f"Erro ao enviar email de reset: {str(api_error)}")
+                print(f"DEBUG: Reset enviado via admin.generate_link")
+            except Exception as link_error:
+                print(f"DEBUG: Erro no admin link: {link_error}")
+                # Último fallback: forçar o tipo de email correto
+                try:
+                    # Usar requisição HTTP com type específico
+                    headers = {
+                        'apikey': settings.SUPABASE_SERVICE_KEY,
+                        'Authorization': f'Bearer {settings.SUPABASE_SERVICE_KEY}',
+                        'Content-Type': 'application/json'
+                    }
+                    
+                    data = {
+                        'email': reset_data.email,
+                        'type': 'recovery',  # Especificar explicitamente o tipo
+                        'options': {
+                            'redirect_to': redirect_url
+                        }
+                    }
+                    
+                    response = requests.post(
+                        f'{settings.SUPABASE_URL}/auth/v1/recover',
+                        headers=headers,
+                        json=data
+                    )
+                    
+                    if response.status_code not in [200, 201]:
+                        raise Exception(f'Fallback Error: {response.status_code} - {response.text}')
+                    
+                    print(f"DEBUG: Reset enviado via fallback com SERVICE_KEY")
+                    
+                except Exception as final_error:
+                    print(f"DEBUG: Erro no fallback final: {final_error}")
+                    raise Exception(f"Erro ao enviar email de reset: {str(api_error)}")
         
         print(f"DEBUG: Reset de senha solicitado para: {reset_data.email}")
         print(f"DEBUG: Redirect URL configurada: {redirect_url}")
