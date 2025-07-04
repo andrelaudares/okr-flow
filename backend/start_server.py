@@ -14,6 +14,20 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
+# 🔧 CARREGAR ARQUIVO .env ANTES DE VERIFICAR VARIÁVEIS
+try:
+    from app.core.config import *  # Isso carrega o load_dotenv()
+    print("✅ Arquivo .env carregado com sucesso!")
+except Exception as e:
+    print(f"⚠️  Erro ao carregar .env: {e}")
+    # Tentar carregar diretamente como fallback
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        print("✅ Arquivo .env carregado via fallback!")
+    except Exception as fallback_error:
+        print(f"❌ Erro no fallback: {fallback_error}")
+
 def check_environment():
     """Verificar se as variáveis de ambiente estão configuradas"""
     required_vars = ['SUPABASE_URL', 'SUPABASE_KEY', 'SUPABASE_SERVICE_KEY']

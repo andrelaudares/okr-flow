@@ -1,46 +1,81 @@
-import React, { useState } from 'react';
-import { Flag } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Flag, ArrowLeft, Eye, EyeOff, Lock, Mail, CheckCircle, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/hooks/use-auth';
+import { useResetPassword } from '@/hooks/use-reset-password';
 
 const ResetPassword = () => {
-  const [email, setEmail] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const { isLoading, message, error, requestReset, updatePassword } = useResetPassword();
+  
+  // Verificar se é um reset via token (usuário clicou no email)
+  const accessToken = searchParams.get('access_token');
+  const refreshToken = searchParams.get('refresh_token');
+  const isTokenReset = Boolean(accessToken && refreshToken);
+  
+  // Estados para o formulário
+  const [email, setEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Estados de UI
+  const [success, setSuccess] = useState(false);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  // Redirecionar se já estiver autenticado
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Função para solicitar reset de senha
+  const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
+    const success = await requestReset(email);
+    if (success) {
+      setSuccess(true);
+    }
+  };
 
-      const data = await response.json();
+  // Função para definir nova senha
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newPassword || !confirmPassword) {
+      return;
+    }
 
-      if (response.ok) {
-        toast.success("Instruções enviadas por email");
-        setResetSent(true);
-      } else {
-        toast.error(data.detail || "Erro ao enviar email de redefinição");
-      }
-    } catch (error: any) {
-      toast.error("Erro ao enviar email de redefinição");
-      console.error("Error in password reset:", error);
-    } finally {
-      setIsLoading(false);
+    if (newPassword !== confirmPassword) {
+      return;
+    }
+
+    if (!accessToken || !refreshToken) {
+      return;
+    }
+
+    const success = await updatePassword({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      new_password: newPassword
+    });
+    
+    if (success) {
+      setSuccess(true);
+      // Redirecionar para login após 3 segundos
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 3000);
     }
   };
 
@@ -53,69 +88,143 @@ const ResetPassword = () => {
               <Flag className="h-6 w-6 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-center bg-gradient-to-r from-nobug-600 to-nobug-500 bg-clip-text text-transparent mb-2">NOBUG OKRs</h1>
-          <p className="text-center text-gray-500">Recupere sua senha</p>
+          <h1 className="text-3xl font-bold text-center bg-gradient-to-r from-nobug-600 to-nobug-500 bg-clip-text text-transparent mb-2">
+            NOBUG OKRs
+          </h1>
+          <p className="text-center text-gray-500">
+            {isTokenReset ? 'Definir nova senha' : 'Recuperar senha'}
+          </p>
         </div>
       </div>
-      <div className="w-full max-w-md">
-        <Card className="w-full max-w-md shadow-card">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">Recuperar senha</CardTitle>
-            <CardDescription className="text-center">
-              {resetSent 
-                ? "Instruções enviadas por email" 
-                : "Insira seu email para receber instruções de recuperação"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {resetSent ? (
-              <div className="text-center space-y-4">
-                <p className="text-sm text-gray-500">
-                  Enviamos instruções para redefinir sua senha para o email informado.
-                  Verifique sua caixa de entrada e siga as instruções.
-                </p>
-                <p className="text-xs text-gray-400">
-                  Não recebeu o email? Verifique a pasta de spam ou tente novamente em alguns minutos.
-                </p>
-                <Button 
-                  onClick={() => navigate("/login")} 
-                  className="w-full"
-                >
-                  Voltar para o login
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleResetPassword}>
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <label htmlFor="email" className="text-sm font-medium">
-                      E-mail
-                    </label>
+
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            {isTokenReset ? 'Nova Senha' : 'Esqueceu sua senha?'}
+          </CardTitle>
+          <CardDescription>
+            {isTokenReset 
+              ? 'Digite sua nova senha abaixo'
+              : 'Digite seu email para receber instruções de recuperação'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* Mensagens de sucesso/erro */}
+          {message && (
+            <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
+          )}
+          
+          {error && (
+            <Alert className="mb-4 border-red-200 bg-red-50 text-red-800">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {success && !isTokenReset ? (
+            <div className="text-center">
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <p className="text-sm text-gray-600">
+                Verifique seu email para continuar com a recuperação da senha.
+              </p>
+            </div>
+          ) : success && isTokenReset ? (
+            <div className="text-center">
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <p className="text-sm text-gray-600">
+                Senha atualizada! Redirecionando para o login...
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={isTokenReset ? handleUpdatePassword : handleRequestReset} className="space-y-4">
+              {!isTokenReset ? (
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="nome@exemplo.com"
-                      required
+                      placeholder="seu.email@exemplo.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      className="pl-10"
+                      required
                     />
                   </div>
-                  <Button disabled={isLoading} className="w-full">
-                    {isLoading ? "Enviando..." : "Enviar instruções"}
-                  </Button>
                 </div>
-              </form>
-            )}
-          </CardContent>
-          {!resetSent && (
-            <CardFooter className="flex justify-center">
-              <Link to="/login" className="text-sm text-nobug-600 hover:underline">
-                Voltar para o login
-              </Link>
-            </CardFooter>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="newPassword">Nova Senha</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="newPassword"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Digite sua nova senha"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirme sua nova senha"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="pl-10 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Processando...' : isTokenReset ? 'Atualizar Senha' : 'Enviar Email'}
+              </Button>
+            </form>
           )}
-        </Card>
-      </div>
+
+          <div className="mt-6 text-center">
+            <Link 
+              to="/login" 
+              className="inline-flex items-center gap-2 text-sm text-nobug-600 hover:underline"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Voltar para o login
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

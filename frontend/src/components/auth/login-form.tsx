@@ -9,6 +9,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import ResetPasswordModal from "./reset-password-modal";
 
 // Schema de validação
 const loginSchema = z.object({
@@ -26,6 +27,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 const LoginForm = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -96,12 +98,13 @@ const LoginForm = () => {
                 <label htmlFor="password" className="text-sm font-medium">
                   Senha
                 </label>
-                <Link 
-                  to="/reset-password" 
-                className="text-sm text-primary hover:underline"
+                <button 
+                  type="button"
+                  onClick={() => setIsResetModalOpen(true)}
+                  className="text-sm text-primary hover:underline"
                 >
                   Esqueceu a senha?
-                </Link>
+                </button>
               </div>
             <div className="relative">
               <Input
@@ -151,6 +154,12 @@ const LoginForm = () => {
           Não tem uma conta? Cadastre-se
         </Button>
       </CardFooter>
+      
+      {/* Modal de reset de senha */}
+      <ResetPasswordModal 
+        open={isResetModalOpen} 
+        onClose={() => setIsResetModalOpen(false)} 
+      />
     </Card>
   );
 };

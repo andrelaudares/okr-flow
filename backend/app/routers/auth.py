@@ -519,10 +519,77 @@ async def request_password_reset(reset_data: ResetPasswordRequest):
             # Usuário inativo não pode fazer reset
             return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
         
-        # Enviar email de reset pelo Supabase Auth
-        reset_response = supabase_admin().auth.reset_password_email(reset_data.email)
+        # Obter configurações do ambiente
+        env_config = get_environment_config()
+        
+        # Configurar URL de redirecionamento baseada no ambiente
+        if env_config.get("ENVIRONMENT") == "production":
+            # URL de produção - ajustar conforme necessário
+            redirect_url = f"{env_config.get('FRONTEND_URL', 'https://okr-flow.vercel.app')}/reset-password"
+        else:
+            # URL de desenvolvimento
+            redirect_url = f"{env_config.get('FRONTEND_URL', 'http://localhost:5173')}/reset-password"
+        
+        # Enviar email de reset usando a API direta do Supabase Auth
+        # Método funciona com todas as versões do SDK
+        try:
+            # Tentar o método nativo primeiro (pode existir em versões mais novas)
+            if hasattr(supabase_admin().auth, 'reset_password_for_email'):
+                reset_response = supabase_admin().auth.reset_password_for_email(
+                    reset_data.email,
+                    options={"redirect_to": redirect_url}
+                )
+            else:
+                # Fallback: usar requisição HTTP direta
+                import requests
+                import json
+                from ..core.settings import settings
+                
+                supabase_url = settings.SUPABASE_URL
+                supabase_key = settings.SUPABASE_KEY
+                
+                headers = {
+                    'apikey': supabase_key,
+                    'Authorization': f'Bearer {supabase_key}',
+                    'Content-Type': 'application/json'
+                }
+                
+                data = {
+                    'email': reset_data.email,
+                    'options': {
+                        'redirect_to': redirect_url
+                    }
+                }
+                
+                response = requests.post(
+                    f'{supabase_url}/auth/v1/recover',
+                    headers=headers,
+                    json=data
+                )
+                
+                if response.status_code not in [200, 201]:
+                    raise Exception(f'API Error: {response.status_code} - {response.text}')
+                
+                print(f"DEBUG: Reset enviado via API HTTP - Status: {response.status_code}")
+                
+        except Exception as api_error:
+            print(f"DEBUG: Erro na API de reset: {api_error}")
+            # Tentar método alternativo usando sign_in_with_otp
+            try:
+                # Usar OTP como alternativa
+                otp_response = supabase_admin().auth.sign_in_with_otp({
+                    'email': reset_data.email,
+                    'options': {
+                        'email_redirect_to': redirect_url
+                    }
+                })
+                print(f"DEBUG: Reset enviado via OTP como fallback")
+            except Exception as otp_error:
+                print(f"DEBUG: Erro no OTP fallback: {otp_error}")
+                raise Exception(f"Erro ao enviar email de reset: {str(api_error)}")
         
         print(f"DEBUG: Reset de senha solicitado para: {reset_data.email}")
+        print(f"DEBUG: Redirect URL configurada: {redirect_url}")
         
         return {"message": "Se o email estiver cadastrado e ativo, você receberá instruções para redefinir sua senha."}
         
@@ -539,7 +606,7 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
     check_supabase_config()
     
     try:
-        # Verificar e usar os tokens para autenticar
+        # Definir uma sessão com os tokens recebidos
         session_response = supabase_admin().auth.set_session(
             access_token=update_data.access_token,
             refresh_token=update_data.refresh_token
@@ -548,19 +615,25 @@ async def update_password_with_token(update_data: UpdatePasswordRequest):
         if not session_response.session:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tokens inválidos ou expirados")
         
-        # Atualizar senha
-        user_response = supabase_admin().auth.update_user({
-            "password": update_data.new_password
-        })
+        # Validar que o token é válido obtendo o usuário
+        user_response = supabase_admin().auth.get_user(update_data.access_token)
         
         if not user_response.user:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido ou expirado")
         
         # Verificar se usuário ainda está ativo
         user_check = supabase_admin().from_('users').select("is_active").eq('email', user_response.user.email).execute()
         
         if user_check.data and not user_check.data[0].get('is_active', True):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário desativado")
+        
+        # Atualizar senha usando o cliente admin com o token definido
+        password_update_response = supabase_admin().auth.update_user({
+            "password": update_data.new_password
+        })
+        
+        if not password_update_response.user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Erro ao atualizar senha")
         
         print(f"DEBUG: Senha atualizada com sucesso para: {user_response.user.email}")
         
