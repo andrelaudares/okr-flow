@@ -30,9 +30,7 @@ const Login = () => {
       <div className="w-full max-w-md">
         <LoginForm />
       </div>
-      <div className="mt-6 text-center text-sm text-gray-500">
-        <p>Não tem uma conta? <Link to="/register" className="text-nobug-600 hover:underline">Cadastre-se</Link></p>
-      </div>
+      
     </div>
   );
 };

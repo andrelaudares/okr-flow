@@ -32,9 +32,7 @@ const Register = () => {
       <div className="w-full max-w-md">
         <RegisterForm />
       </div>
-      <div className="mt-6 text-center text-sm text-gray-500">
-        <p>Já tem uma conta? <Link to="/login" className="text-nobug-600 hover:underline">Faça login</Link></p>
-      </div>
+      
     </div>
   );
 };
