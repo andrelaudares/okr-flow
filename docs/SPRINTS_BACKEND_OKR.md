@@ -18,7 +18,7 @@ A Sprint 1 foi implementada com sucesso! Todas as funcionalidades de autenticaç
 1. Execute o script `backend/sprint1_database_setup.sql` no Supabase SQL Editor
 2. Configure as variáveis de ambiente no `.env`
 3. Execute o backend: `cd backend && uvicorn app.main:app --reload`
-4. Acesse a documentação: `http://localhost:8000/docs`
+4. Acesse a documentação: `http://localhost:8001/docs`
 
 ---
 

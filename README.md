@@ -167,7 +167,7 @@ SUPABASE_SERVICE_KEY=eyJ0eXAiOiJKV1Q...  # service_role key
 # Servidor
 ENVIRONMENT=development  # ou 'production'
 HOST=localhost
-PORT=8000
+PORT=8001
 
 # === CONFIGURAÇÕES OPCIONAIS ===
 
@@ -215,12 +215,12 @@ allow_origins=["https://seudominio.com", "https://www.seudominio.com"],  # Seus 
 python start_server.py
 
 # Ou com auto-reload
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
 ### 5. Verificar API
 
-Acesse: `http://localhost:8000/docs` para ver a documentação automática da API.
+Acesse: `http://localhost:8001/docs` para ver a documentação automática da API.
 
 ---
 
@@ -241,7 +241,7 @@ Crie o arquivo `.env` na pasta `frontend/`:
 
 ```env
 # === DESENVOLVIMENTO ===
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8001
 VITE_ENVIRONMENT=development
 
 # === PRODUÇÃO ===
@@ -262,11 +262,11 @@ VITE_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1Q...
 
 ```typescript
 // LINHA 10 - URL base da API
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 ```
 
 **💡 Como funciona:**
-- **Desenvolvimento**: Usa `http://localhost:8000` (backend local)
+- **Desenvolvimento**: Usa `http://localhost:8001` (backend local)
 - **Produção**: Usa `VITE_API_URL` do arquivo `.env`
 
 **✅ Para produção, defina no `.env`:**
@@ -447,7 +447,7 @@ ALLOWED_ORIGINS=https://seudominio.com,https://www.seudominio.com
 | `SUPABASE_SERVICE_KEY` | ✅ | Chave service_role do Supabase | `eyJ0eXAiOiJKV1Q...` |
 | `ENVIRONMENT` | ✅ | Ambiente (development/production) | `production` |
 | `HOST` | ❌ | Host do servidor | `0.0.0.0` |
-| `PORT` | ❌ | Porta do servidor | `8000` |
+| `PORT` | ❌ | Porta do servidor | `8001` |
 | `WORKERS_COUNT` | ❌ | Número de workers | `4` |
 | `TIMEOUT_KEEP_ALIVE` | ❌ | Timeout em segundos | `65` |
 | `ENABLE_GZIP` | ❌ | Habilitar compressão | `true` |

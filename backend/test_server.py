@@ -126,8 +126,8 @@ def analyze_results(results: List[Dict[str, Any]]):
 async def main():
     """Função principal"""
     parser = argparse.ArgumentParser(description='Teste de Performance do Servidor OKR')
-    parser.add_argument('--url', type=str, default='http://localhost:8000', 
-                       help='URL base do servidor (padrão: http://localhost:8000)')
+    parser.add_argument('--url', type=str, default='http://localhost:8001',
+                        help='URL base do servidor (padrão: http://localhost:8001)')
     parser.add_argument('--requests', type=int, default=10, 
                        help='Número de requests por endpoint (padrão: 10)')
     

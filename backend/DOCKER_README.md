@@ -6,7 +6,7 @@ Este guia explica como configurar e executar o Sistema OKR Backend usando Docker
 
 ### Componentes
 - **Frontend**: Vercel (`https://okr.nobug.com.br`)
-- **Backend**: Docker Container (porta 8000)
+- **Backend**: Docker Container (porta 8001)
 - **Banco de Dados**: Supabase (PostgreSQL)
 
 ### Fluxo de Dados
@@ -122,8 +122,8 @@ curl -s https://api.ipify.org
 No painel da Vercel, adicione as variáveis de ambiente:
 
 ```env
-VITE_API_URL=http://IP_DO_SERVIDOR:8000
-VITE_API_BASE_URL=http://IP_DO_SERVIDOR:8000/api
+VITE_API_URL=http://IP_DO_SERVIDOR:8001
+VITE_API_BASE_URL=http://IP_DO_SERVIDOR:8001/api
 ```
 
 ### 3. Configurar CORS
@@ -148,13 +148,13 @@ allow_origins=[
 
 ```bash
 # Verificar saúde básica
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Verificar conectividade detalhada
-curl http://localhost:8000/debug/connectivity
+curl http://localhost:8001/debug/connectivity
 
 # Verificar status JWT
-curl http://localhost:8000/monitor/jwt-status
+curl http://localhost:8001/monitor/jwt-status
 ```
 
 ### Logs
@@ -182,8 +182,8 @@ Os logs são salvos em:
 ### Firewall
 
 ```bash
-# Permitir porta 8000
-sudo ufw allow 8000/tcp
+# Permitir porta 8001
+sudo ufw allow 8001/tcp
 
 # Verificar regras
 sudo ufw status
@@ -202,7 +202,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
     
     location / {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://localhost:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -277,7 +277,7 @@ docker-compose exec okr-backend env | grep SUPABASE
 
 ```bash
 # Testar conectividade
-curl http://localhost:8000/debug/connectivity
+curl http://localhost:8001/debug/connectivity
 
 # Verificar variáveis
 docker-compose exec okr-backend python -c "from app.core.settings import settings; print(settings.SUPABASE_URL)"
@@ -287,7 +287,7 @@ docker-compose exec okr-backend python -c "from app.core.settings import setting
 
 ```bash
 # Testar CORS
-curl -H "Origin: https://okr.nobug.com.br" http://localhost:8000/health
+curl -H "Origin: https://okr.nobug.com.br" http://localhost:8001/health
 
 # Verificar logs de CORS
 docker-compose logs okr-backend | grep -i cors
@@ -310,9 +310,9 @@ docker-compose restart okr-backend
 
 - [ ] Docker e Docker Compose instalados
 - [ ] Arquivo `.env` configurado
-- [ ] Porta 8000 liberada no firewall
+- [ ] Porta 8001 liberada no firewall
 - [ ] Serviços executando: `docker-compose ps`
-- [ ] Health check OK: `curl http://localhost:8000/health`
+- [ ] Health check OK: `curl http://localhost:8001/health`
 - [ ] Frontend configurado com IP/URL do servidor
 - [ ] CORS funcionando
 - [ ] Logs sendo gerados

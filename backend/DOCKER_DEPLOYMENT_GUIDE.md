@@ -6,7 +6,7 @@
 O sistema é dividido em duas partes principais:
 
 1. **Frontend** (Vercel) - `https://okr.nobug.com.br` / `https://okr-flow.vercel.app`
-2. **Backend** (Docker no servidor da empresa) - `http://IP_DO_SERVIDOR:8000`
+2. **Backend** (Docker no servidor da empresa) - `http://IP_DO_SERVIDOR:8001`
 
 ### Como Funciona a Conexão
 
@@ -18,7 +18,7 @@ graph TD
     
     E[Usuário] --> A
     A --> F[API Calls]
-    F --> G[IP_SERVIDOR:8000]
+    F --> G[IP_SERVIDOR:8001]
     G --> H[Sistema OKR Backend]
 ```
 
@@ -87,16 +87,16 @@ docker-compose down
 ### 1. IP/URL do Servidor
 
 Após o deploy, o backend estará disponível em:
-- **IP Local**: `http://IP_DO_SERVIDOR:8000`
-- **Domínio**: `http://seu-dominio.com:8000` (se tiver domínio)
+- **IP Local**: `http://IP_DO_SERVIDOR:8001`
+- **Domínio**: `http://seu-dominio.com:8001` (se tiver domínio)
 
 ### 2. Configurar no Frontend (Vercel)
 
 No painel da Vercel, adicione as seguintes variáveis de ambiente:
 
 ```env
-VITE_API_URL=http://IP_DO_SERVIDOR:8000
-VITE_API_BASE_URL=http://IP_DO_SERVIDOR:8000/api
+VITE_API_URL=http://IP_DO_SERVIDOR:8001
+VITE_API_BASE_URL=http://IP_DO_SERVIDOR:8001/api
 ```
 
 ### 3. Verificar CORS
@@ -111,8 +111,8 @@ O backend já está configurado para aceitar requisições dos domínios:
 ### Configuração de Firewall
 
 ```bash
-# Permitir porta 8000
-sudo ufw allow 8000/tcp
+# Permitir porta 8001
+sudo ufw allow 8001/tcp
 
 # Verificar regras
 sudo ufw status
@@ -131,7 +131,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
     
     location / {
-        proxy_pass http://localhost:8000;
+        proxy_pass http://localhost:8001;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -146,10 +146,10 @@ server {
 
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Status detalhado
-curl http://localhost:8000/debug/connectivity
+curl http://localhost:8001/debug/connectivity
 ```
 
 ### Logs em Tempo Real
@@ -208,7 +208,7 @@ tar -czf logs-backup-$(date +%Y%m%d).tar.gz ./logs/
    docker-compose exec okr-backend env | grep SUPABASE
    
    # Testar conectividade
-   curl http://localhost:8000/debug/connectivity
+   curl http://localhost:8001/debug/connectivity
    ```
 
 2. **Erro de CORS**
@@ -217,7 +217,7 @@ tar -czf logs-backup-$(date +%Y%m%d).tar.gz ./logs/
    docker-compose logs okr-backend | grep -i cors
    
    # Verificar configuração
-   curl -H "Origin: https://okr.nobug.com.br" http://localhost:8000/health
+   curl -H "Origin: https://okr.nobug.com.br" http://localhost:8001/health
    ```
 
 3. **Alto Uso de Recursos**
@@ -249,9 +249,9 @@ docker-compose restart okr-backend
 
 - [ ] Docker e Docker Compose instalados
 - [ ] Arquivo `.env` configurado com credenciais Supabase
-- [ ] Firewall configurado (porta 8000)
+- [ ] Firewall configurado (porta 8001)
 - [ ] Sistema executando: `docker-compose up -d`
-- [ ] Health check funcionando: `curl http://localhost:8000/health`
+- [ ] Health check funcionando: `curl http://localhost:8001/health`
 - [ ] Frontend configurado com IP/URL do servidor
 - [ ] CORS funcionando (testar requisições do frontend)
 - [ ] Logs sendo gerados corretamente
@@ -261,8 +261,8 @@ docker-compose restart okr-backend
 
 Em caso de problemas, verificar:
 1. Logs do sistema: `docker-compose logs -f`
-2. Health check: `curl http://localhost:8000/health`
-3. Conectividade: `curl http://localhost:8000/debug/connectivity`
+2. Health check: `curl http://localhost:8001/health`
+3. Conectividade: `curl http://localhost:8001/debug/connectivity`
 4. Configurações de rede e firewall
 
 ---

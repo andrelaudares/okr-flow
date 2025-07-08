@@ -121,14 +121,14 @@ configure_firewall() {
     
     if command_exists ufw; then
         if ufw status | grep -q "Status: active"; then
-            print_info "Configurando firewall para porta 8000..."
-            sudo ufw allow 8000/tcp
-            print_success "Porta 8000 liberada no firewall"
+            print_info "Configurando firewall para porta 8001..."
+sudo ufw allow 8001/tcp
+print_success "Porta 8001 liberada no firewall"
         else
-            print_warning "UFW não está ativo. Certifique-se de que a porta 8000 está liberada."
+            print_warning "UFW não está ativo. Certifique-se de que a porta 8001 está liberada."
         fi
     else
-        print_warning "UFW não encontrado. Certifique-se de que a porta 8000 está liberada no firewall."
+        print_warning "UFW não encontrado. Certifique-se de que a porta 8001 está liberada no firewall."
     fi
 }
 
@@ -190,7 +190,7 @@ health_check() {
     attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+        if curl -f http://localhost:8001/health > /dev/null 2>&1; then
             print_success "Health check passou! Sistema está funcionando."
             break
         else
@@ -215,16 +215,16 @@ show_system_info() {
     print_info "📊 Informações do Sistema:"
     echo "   • Container: $(docker-compose ps --services)"
     echo "   • Status: $(docker-compose ps --format 'table {{.Service}}\t{{.Status}}')"
-    echo "   • URL: http://localhost:8000"
-    echo "   • Health Check: http://localhost:8000/health"
-    echo "   • Documentação: http://localhost:8000/docs"
+    echo "   • URL: http://localhost:8001"
+echo "   • Health Check: http://localhost:8001/health"
+echo "   • Documentação: http://localhost:8001/docs"
     echo ""
     
     # Obter IP do servidor
     local_ip=$(hostname -I | awk '{print $1}')
     print_info "🌐 URLs de Acesso:"
-    echo "   • Local: http://localhost:8000"
-    echo "   • Rede: http://$local_ip:8000"
+    echo "   • Local: http://localhost:8001"
+echo "   • Rede: http://$local_ip:8001"
     echo ""
     
     print_info "📋 Comandos Úteis:"
@@ -235,7 +235,7 @@ show_system_info() {
     echo ""
     
     print_warning "🔧 Próximos Passos:"
-    echo "   1. Configure o frontend (Vercel) com a URL: http://$local_ip:8000"
+    echo "   1. Configure o frontend (Vercel) com a URL: http://$local_ip:8001"
     echo "   2. Teste a conectividade do frontend"
     echo "   3. Configure certificado SSL (opcional)"
     echo "   4. Configure monitoramento"

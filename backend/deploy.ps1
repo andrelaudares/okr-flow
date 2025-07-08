@@ -192,7 +192,7 @@ function Test-HealthCheck {
     
     while ($attempt -le $maxAttempts) {
         try {
-            $response = Invoke-WebRequest -Uri "http://localhost:8000/health" -ErrorAction Stop
+            $response = Invoke-WebRequest -Uri "http://localhost:8001/health" -ErrorAction Stop
             if ($response.StatusCode -eq 200) {
                 Write-Success "Health check passou! Sistema está funcionando."
                 break
@@ -224,17 +224,17 @@ function Show-SystemInfo {
     
     Write-Host "   • Container: $services"
     Write-Host "   • Status: $status"
-    Write-Host "   • URL: http://localhost:8000"
-    Write-Host "   • Health Check: http://localhost:8000/health"
-    Write-Host "   • Documentação: http://localhost:8000/docs"
+    Write-Host "   • URL: http://localhost:8001"
+Write-Host "   • Health Check: http://localhost:8001/health"
+Write-Host "   • Documentação: http://localhost:8001/docs"
     Write-Host ""
     
     # Obter IP do servidor
     $localIp = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Ethernet*","Wi-Fi*" | Where-Object { $_.IPAddress -ne "127.0.0.1" } | Select-Object -First 1).IPAddress
     
     Write-Info "🌐 URLs de Acesso:"
-    Write-Host "   • Local: http://localhost:8000"
-    Write-Host "   • Rede: http://$localIp:8000"
+    Write-Host "   • Local: http://localhost:8001"
+Write-Host "   • Rede: http://$localIp:8001"
     Write-Host ""
     
     Write-Info "📋 Comandos Úteis:"
@@ -245,7 +245,7 @@ function Show-SystemInfo {
     Write-Host ""
     
     Write-Warning "🔧 Próximos Passos:"
-    Write-Host "   1. Configure o frontend (Vercel) com a URL: http://$localIp:8000"
+    Write-Host "   1. Configure o frontend (Vercel) com a URL: http://$localIp:8001"
     Write-Host "   2. Teste a conectividade do frontend"
     Write-Host "   3. Configure certificado SSL (opcional)"
     Write-Host "   4. Configure monitoramento"

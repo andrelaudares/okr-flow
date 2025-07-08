@@ -74,7 +74,7 @@ max_attempts=30
 attempt=1
 
 while [ $attempt -le $max_attempts ]; do
-    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+    if curl -s http://localhost:8001/health > /dev/null 2>&1; then
         echo "✅ API está respondendo!"
         break
     else
@@ -98,8 +98,8 @@ echo "📊 Status do sistema:"
 docker-compose ps
 
 echo ""
-echo "🌐 API disponível em: http://localhost:8000"
-echo "🏥 Health check: http://localhost:8000/health"
+echo "🌐 API disponível em: http://localhost:8001"
+echo "🏥 Health check: http://localhost:8001/health"
 echo ""
 echo "📋 Comandos úteis:"
 echo "   Ver logs: docker-compose logs -f"
@@ -108,7 +108,7 @@ echo "   Reiniciar: docker-compose restart"
 echo ""
 echo "🔧 Para configurar o frontend (Vercel):"
 echo "   Configure a variável VITE_API_URL para:"
-echo "   http://$(curl -s ifconfig.me):8000"
+echo "   http://$(curl -s ifconfig.me):8001"
 echo ""
 echo "📖 Documentação completa: ./DOCKER_README.md"
 echo ""
