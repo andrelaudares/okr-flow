@@ -46,4 +46,4 @@ USER app
 EXPOSE $PORT
 
 # Comando para executar a aplicação
-CMD ["python", "start_server.py", "--workers", "4"] 
+CMD ["python", "start_server.py", "--port", "8001", "--workers", "4"] 

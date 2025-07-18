@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # Backend Service
+  okr-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: okr-flow-backend
+    ports:
+      - "8001:8000"
+    environment:
+      - ENVIRONMENT=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      
+      # Configurações do Supabase (obrigatórias)
+      - SUPABASE_URL=https://tqdhcxzioahowqapftxb.supabase.co
+      - SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGhjeHppb2Fob3dxYXBmdHhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc4NjQ3OTMsImV4cCI6MjA2MzQ0MDc5M30.2gjDsqrT_Kx39-XmenGBgU4pvwpTPoKAYIedsh_H7XU
+      - SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxZGhjeHppb2Fob3dxYXBmdHhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Nzg2NDc5MywiZXhwIjoyMDYzNDQwNzkzfQ.elgZeOXS5LA6SK4ni1034VkUHP0VuAkJN_70n-efqJM
+      
+      # Configurações de Performance
+      - WORKERS_COUNT=4
+      - TIMEOUT_KEEP_ALIVE=65
+      - TIMEOUT_GRACEFUL_SHUTDOWN=15
+      - ENABLE_GZIP=true
+      - LOG_LEVEL=INFO
+      - MAX_REQUEST_SIZE=16777216
+      
+      # Configurações de Cache
+      - CACHE_TTL=300
+      - CACHE_MAXSIZE=1000
+      
+      # Configurações de Conexão
+      - CONNECTION_POOL_SIZE=20
+      - CONNECTION_TIMEOUT=30
+      
+      # Configurações de JWT
+      - JWT_EXPIRATION_TIME=2592000
+      - JWT_REFRESH_EXPIRATION_TIME=7776000
+      - SESSION_TIMEOUT=86400
+      - EXTEND_SESSION_ON_ACTIVITY=true
+      
+      # URLs do Frontend (importante para CORS)
+      - FRONTEND_URL=http://localhost:3002
+      - ALLOWED_ORIGINS=http://localhost:3002,http://localhost:3000
+      
+      # Configurações de pagamento
+      - ASAAS_API_KEY=aact_hmlg_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjE5YzNhZmM0LTMwZGQtNDkzNy05YmNlLWZiNmRiYTkwM2EzYzo6JGFhY2hfMmEwOWIwNjEtMDU5Mi00MzRkLWE4YzYtOWQwNzBjYmU5ZGJm
+      - ASAAS_BASE_URL=https://www.asaas.com/api/v3
+      
+    # env_file removido - variáveis definidas diretamente acima
+    volumes:
+      # Volume para persistir logs
+      - ./backend/logs:/app/logs:rw
+      # Volume para dados temporários
+      - ./backend/tmp:/app/tmp:rw
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - okr-network
+
+  # Frontend Service
+  okr-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8001
+    container_name: okr-flow-frontend
+    ports:
+      - "3002:80"
+    environment:
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    depends_on:
+      okr-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - okr-network
+    
+    # Configurações de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+networks:
+  okr-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+# Para usar este docker-compose:
+# 1. Crie um arquivo .env na pasta backend com as credenciais Supabase
+# 2. Execute: docker-compose up -d --build
+# 3. Frontend: http://localhost:3002
+# 4. Backend: http://localhost:8001
+# 5. Para parar: docker-compose down
+# 6. Para ver logs: docker-compose logs -f
+# 7. Para atualizar: docker-compose down && docker-compose up -d --build 
