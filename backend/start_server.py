@@ -88,7 +88,7 @@ def get_server_config(args):
 def main():
     """Função principal otimizada"""
     parser = argparse.ArgumentParser(description='Servidor OKR Backend Otimizado')
-    parser.add_argument('--port', type=int, default=8001, help='Porta do servidor (padrão: 8001)')
+    parser.add_argument('--port', type=int, default=8000, help='Porta do servidor (padrão: 8000)')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host do servidor (padrão: 0.0.0.0)')
     parser.add_argument('--reload', action='store_true', help='Ativar reload automático (apenas desenvolvimento)')
     parser.add_argument('--workers', type=int, default=1, help='Número de workers (padrão: 1)')
